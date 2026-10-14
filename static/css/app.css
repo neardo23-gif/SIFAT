@@ -1,0 +1,231 @@
+/* =========================================================
+   SIFAT - estilos propios (Tailwind va por CDN)
+   Motion: ease-out fuerte, 150-220ms en interacciones,
+   500ms en entradas. Todo se apaga con reduced-motion.
+   ========================================================= */
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --violet: #6b49f0;
+  --soft: #a18cff;
+  --sello: #ff7a2f;
+  --line: #232323;
+}
+
+html { scroll-behavior: smooth; }
+body { font-feature-settings: "ss01", "cv11"; text-rendering: optimizeLegibility; }
+::selection { background: var(--violet); color: #fff; }
+
+/* ---------- accesibilidad base ---------- */
+.skip-link {
+  position: absolute; left: 1rem; top: -4rem; z-index: 100;
+  background: #fff; color: #000; padding: .6rem 1rem; border-radius: .6rem; font-weight: 600;
+  transition: top .15s var(--ease-out);
+}
+.skip-link:focus { top: 1rem; }
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--soft);
+  outline-offset: 2px;
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---------- marca ---------- */
+.logo { outline-offset: 4px; }
+.logo-mark {
+  width: 18px; height: 18px; border-radius: 4px; background: var(--violet);
+  position: relative; flex: none;
+  background-image: radial-gradient(circle at 30% 30%, var(--sello) 0 2.2px, transparent 2.4px),
+                    radial-gradient(circle at 70% 70%, var(--sello) 0 2.2px, transparent 2.4px);
+}
+
+/* ---------- navegación ---------- */
+.nav-link {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .55rem .7rem; border-radius: .6rem;
+  font-size: 15px; font-weight: 500; color: #a8a8a8;
+  transition: background-color .15s var(--ease-out), color .15s var(--ease-out);
+}
+.nav-link.is-active { background: #151515; color: #fff; }
+.nav-link.is-active svg { color: var(--soft); }
+.top-link {
+  align-items: center; padding: .5rem .8rem; border-radius: .6rem;
+  font-size: 15px; font-weight: 500; color: #a8a8a8;
+  transition: color .15s var(--ease-out), background-color .15s var(--ease-out);
+}
+@media (hover: hover) {
+  .nav-link:hover { background: #111; color: #fff; }
+  .top-link:hover { color: #fff; background: #111; }
+}
+
+/* ---------- botones ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .62rem 1rem; border-radius: 999px;
+  font-size: 15px; font-weight: 600; line-height: 1.2; white-space: nowrap;
+  border: 1px solid transparent; cursor: pointer;
+  transition: transform .16s var(--ease-out), background-color .16s var(--ease-out),
+              border-color .16s var(--ease-out), color .16s var(--ease-out), opacity .16s var(--ease-out);
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-sm { padding: .42rem .8rem; font-size: 14px; }
+.btn-lg { padding: .85rem 1.4rem; font-size: 16px; }
+.btn-primary { background: var(--violet); color: #fff; }
+.btn-light { background: #fff; color: #000; }
+.btn-ghost { background: transparent; color: #f2f2f2; border-color: #333; }
+.btn-danger { background: #8f2a2a; color: #fff; }
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) { background: #7d5df5; }
+  .btn-light:hover:not(:disabled) { background: #e6e6e6; }
+  .btn-ghost:hover:not(:disabled) { background: #141414; border-color: #4a4a4a; }
+  .btn-danger:hover:not(:disabled) { background: #a63333; }
+}
+
+.icon-btn {
+  display: inline-grid; place-items: center; height: 2.25rem; width: 2.25rem;
+  border-radius: .6rem; color: #a8a8a8; cursor: pointer; flex: none;
+  transition: background-color .15s var(--ease-out), color .15s var(--ease-out), transform .15s var(--ease-out);
+}
+.icon-btn:active { transform: scale(0.94); }
+@media (hover: hover) { .icon-btn:hover { background: #1a1a1a; color: #fff; } }
+
+/* ---------- formularios ---------- */
+.label { display: block; margin-bottom: .4rem; font-size: 14px; font-weight: 500; color: #c9c9c9; }
+.hint { margin-top: .35rem; font-size: 13px; color: #8a8a8a; }
+.field {
+  width: 100%; border-radius: .7rem; border: 1px solid #2c2c2c; background: #000;
+  padding: .6rem .8rem; font-size: 16px; color: #f2f2f2; /* 16px evita el zoom en iOS */
+  transition: border-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+.field-lg { padding: .85rem 1rem; border-radius: .9rem; }
+.field-pl { padding-left: 2.6rem; }
+.field-pr { padding-right: 3rem; }
+.field::placeholder { color: #7f7f7f; }
+.field:focus-visible { outline: none; border-color: var(--soft); box-shadow: 0 0 0 3px rgba(161, 140, 255, .25); }
+.field[aria-invalid="true"] { border-color: var(--sello); }
+select.field { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .75rem center; padding-right: 2.25rem; }
+select.field option { background: #0c0c0c; }
+
+/* ---------- tabla ---------- */
+.row { border-bottom: 1px solid var(--line); transition: background-color .15s var(--ease-out); }
+tbody .row:last-child { border-bottom: 0; }
+tr[data-id] { cursor: pointer; }
+.row-open { border-radius: .3rem; }
+@media (hover: hover) { .row:hover { background: #111; } }
+
+.chip { display: inline-flex; align-items: center; gap: .45rem; font-size: 14px; }
+.dot { display: inline-block; height: .5rem; width: .5rem; border-radius: 999px; }
+
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ---------- dither: la perforación de ticket ---------- */
+.dither-bg {
+  background-image: url("/static/dither.svg");
+  background-size: cover; background-position: right center; opacity: .9;
+  /* el lado del texto queda limpio para que se lea */
+  -webkit-mask-image: linear-gradient(to right, transparent 15%, #000 62%);
+          mask-image: linear-gradient(to right, transparent 15%, #000 62%);
+}
+.dither-panel {
+  position: relative; overflow: hidden; background: var(--violet);
+}
+.dither-panel::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: url("/static/dither.svg"); background-size: cover; background-position: right center;
+}
+.dither-panel > * { position: relative; }
+.dither-chip {
+  height: 56px; width: 56px; border-radius: 14px; background: var(--violet);
+  background-image: url("/static/dither.svg"); background-size: 520px auto; background-position: 85% 40%;
+}
+
+/* ---------- factura de ejemplo ---------- */
+.slip { background: #fff; border-radius: 18px 18px 0 0; position: relative; box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .55); }
+.slip-edge {
+  height: 14px; margin-top: 4px;
+  background: linear-gradient(-45deg, transparent 8px, #fff 0) 0 0 / 16px 14px,
+              linear-gradient(45deg, transparent 8px, #fff 0) 0 0 / 16px 14px;
+  background-repeat: repeat-x;
+  transform: translateY(13px);
+}
+.slip { margin-bottom: 14px; }
+
+/* ---------- cifras ---------- */
+.stat { display: flex; flex-direction: column; }
+
+/* ---------- tarjetas con elevación al pasar el cursor ---------- */
+.lift { transition: transform .22s var(--ease-out), border-color .22s var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover { transform: translateY(-3px); }
+  .lift.border:hover { border-color: #3a3a3a; }
+}
+
+/* ---------- modales: dialog nativo con transición ---------- */
+dialog.modal {
+  margin: auto; padding: 0; color: inherit;
+  border: 1px solid #2a2a2a; border-radius: 1.25rem; background: #0c0c0c;
+  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, .8);
+  max-height: calc(100dvh - 2rem);
+  opacity: 0; transform: scale(0.96) translateY(6px);
+  transition: opacity .14s var(--ease-out), transform .14s var(--ease-out),
+              overlay .14s allow-discrete, display .14s allow-discrete;
+}
+dialog.modal[open] {
+  opacity: 1; transform: none;
+  transition-duration: .22s;
+}
+@starting-style {
+  dialog.modal[open] { opacity: 0; transform: scale(0.96) translateY(6px); }
+}
+dialog.modal::backdrop {
+  background: rgba(0, 0, 0, .72); backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity .14s var(--ease-out), overlay .14s allow-discrete, display .14s allow-discrete;
+}
+dialog.modal[open]::backdrop { opacity: 1; transition-duration: .22s; }
+@starting-style {
+  dialog.modal[open]::backdrop { opacity: 0; }
+}
+
+/* ---------- toasts ---------- */
+.toast {
+  min-width: 240px; max-width: 360px; padding: .8rem 1rem; border-radius: .9rem;
+  background: #fff; color: #000; font-size: 15px; font-weight: 500;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, .6);
+  animation: toast-in .24s var(--ease-out);
+}
+.toast.is-error { background: #ffd9c4; }
+.toast.is-out { opacity: 0; transform: translateY(6px); transition: opacity .16s var(--ease-out), transform .16s var(--ease-out); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+
+/* ---------- entrada de la landing (una sola secuencia) ---------- */
+.hero-in { animation: rise .7s var(--ease-out) both; }
+.hero-in-2 { animation-delay: .12s; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+/* ---------- entradas al hacer scroll (solo landing, una vez) ---------- */
+.js [data-reveal] { opacity: 0; transform: translateY(14px); }
+.js [data-reveal].is-in {
+  opacity: 1; transform: none;
+  transition: opacity .55s var(--ease-out), transform .55s var(--ease-out);
+  transition-delay: var(--d, 0ms);
+}
+/* .lift y data-reveal comparten transform: tras la entrada, devolvemos su transición propia */
+.js .lift[data-reveal].is-in.settled { transition: transform .22s var(--ease-out), border-color .22s var(--ease-out); }
+
+/* ---------- movimiento reducido ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .hero-in { animation: none; }
+  .js [data-reveal] { opacity: 1; transform: none; }
+  .js [data-reveal].is-in { transition: none; }
+  .lift:hover { transform: none; }
+  dialog.modal, dialog.modal::backdrop { transition-duration: .01ms !important; transform: none; }
+  .toast { animation: none; }
+  .btn, .icon-btn { transition: none; }
+  .btn:active, .icon-btn:active { transform: none; }
+}

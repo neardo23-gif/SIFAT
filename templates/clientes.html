@@ -1,0 +1,39 @@
+{% extends "app_base.html" %}
+{% block title %}Clientes · SIFAT{% endblock %}
+
+{% block main %}
+<h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Clientes</h1>
+<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Un cliente con facturas no se puede eliminar. Aquí se muestran datos de ejemplo.</p>
+
+<section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-cli">
+  <h2 id="t-cli" class="sr-only">Lista de clientes</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[640px] text-left text-[15px]">
+      <caption class="sr-only">Clientes registrados</caption>
+      <thead>
+        <tr class="border-b border-line text-[13px] text-mute">
+          <th scope="col" class="px-4 py-3 font-medium">Razón social</th>
+          <th scope="col" class="px-4 py-3 font-medium">RFC</th>
+          <th scope="col" class="px-4 py-3 font-medium">C.P. fiscal</th>
+          <th scope="col" class="px-4 py-3 font-medium">Correo</th>
+          <th scope="col" class="px-4 py-3 font-medium">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+        <tr class="row">
+          <td class="px-4 py-3.5 font-medium">{{ c.razon_social }}<span class="ml-2 font-mono text-[12px] text-mute">{{ c.id }}</span></td>
+          <td class="px-4 py-3.5 font-mono text-[13px]">{{ c.rfc }}</td>
+          <td class="px-4 py-3.5 tabular-nums text-mute">{{ c.cp }}</td>
+          <td class="px-4 py-3.5 text-mute">{{ c.email }}</td>
+          <td class="px-4 py-3.5">
+            {% if c.activo %}<span class="chip"><span class="dot bg-soft"></span>Activo</span>
+            {% else %}<span class="chip text-mute"><span class="dot border border-mute"></span>Inactivo</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

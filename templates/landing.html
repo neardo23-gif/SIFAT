@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}SIFAT · Sistema de facturación{% endblock %}
+
+{% block body %}
+<header class="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur">
+  <div class="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-3.5 sm:px-8">
+    <a href="{{ url_for('landing') }}" class="logo inline-flex items-center gap-2.5 text-[19px] font-bold tracking-tight">
+      <span class="logo-mark" aria-hidden="true"></span>SIFAT
+    </a>
+    <nav class="flex items-center gap-1 sm:gap-2" aria-label="Principal">
+      <a href="#datos" class="top-link hidden sm:inline-flex">Cómo se guardan los datos</a>
+      <a href="#acceso" class="top-link hidden sm:inline-flex">Acceso</a>
+      <a href="{{ url_for('catalogo') }}" class="btn btn-light btn-sm">Abrir catálogo</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenido">
+
+  {# ================= HERO ================= #}
+  <section class="mx-auto grid max-w-[1200px] items-center gap-12 px-4 pb-16 pt-14 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:pb-24 lg:pt-24">
+    <div class="hero-in">
+      <h1 class="text-[44px] font-bold leading-[1.02] tracking-[-0.035em] sm:text-[64px] lg:text-[76px]">
+        Emite la factura. El catálogo ya está listo.
+      </h1>
+      <p class="mt-6 max-w-[46ch] text-[18px] leading-relaxed text-mute">
+        SIFAT junta clientes, servicios, facturas y pagos en un solo lugar. Los servicios se consultan al instante y la facturación queda protegida por transacciones.
+      </p>
+      <div class="mt-9 flex flex-wrap items-center gap-3">
+        <a href="{{ url_for('catalogo') }}" class="btn btn-primary btn-lg">Abrir catálogo</a>
+        <a href="#datos" class="btn btn-ghost btn-lg">Ver cómo se guardan los datos</a>
+      </div>
+    </div>
+
+    <div class="hero-in hero-in-2 relative" aria-label="Ejemplo de factura">
+      <div class="dither-panel rounded-3xl p-5 sm:p-9">
+        <article class="slip mx-auto w-full max-w-[400px] text-[#0b0b0b]" aria-label="Factura FAC-0001">
+          <div class="flex items-start justify-between gap-4 px-6 pt-6">
+            <div>
+              <p class="font-mono text-[13px] text-[#5b5b5b]">FAC-0001</p>
+              <p class="mt-0.5 text-[17px] font-bold tracking-tight">Consultoría Sur SA de CV</p>
+            </div>
+            <span class="rounded-full bg-[#0b0b0b] px-2.5 py-1 text-[13px] font-semibold text-white">Pagada</span>
+          </div>
+          <div class="mt-5 px-6">
+            <div class="flex items-baseline justify-between gap-4 border-t border-[#d9d9d9] py-3 text-[15px]">
+              <div>
+                <p class="font-semibold">Hosting Básico</p>
+                <p class="text-[13px] text-[#5b5b5b]">1 mes · HOST-BAS</p>
+              </div>
+              <p class="tabular-nums">$349.00</p>
+            </div>
+            <div class="flex justify-between border-t border-[#d9d9d9] py-2.5 text-[15px] text-[#5b5b5b]">
+              <p>IVA 16%</p><p class="tabular-nums">$55.84</p>
+            </div>
+            <div class="flex items-baseline justify-between border-t-2 border-[#0b0b0b] py-4">
+              <p class="text-[15px] font-semibold">Total</p>
+              <p class="text-[30px] font-bold leading-none tracking-tight tabular-nums">$404.84</p>
+            </div>
+          </div>
+          <div class="slip-edge" aria-hidden="true"></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  {# ================= CIFRAS ================= #}
+  <section class="border-y border-line" aria-label="El sistema en cifras">
+    <dl class="mx-auto grid max-w-[1200px] grid-cols-2 lg:grid-cols-4">
+      {% set cifras = [
+        ('100+', 'servicios en el catálogo'),
+        ('10', 'tablas relacionales en MySQL'),
+        ('1', 'lectura para traer un servicio completo'),
+        ('4', 'operaciones sobre el catálogo: agregar, consultar, editar y eliminar')
+      ] %}
+      {% for n, t in cifras %}
+      <div class="stat border-line px-4 py-8 sm:px-8 sm:py-10 {{ 'border-l' if not loop.first }} {{ 'border-t lg:border-t-0' if loop.index > 2 }}" data-reveal>
+        <dt class="order-2 mt-2 max-w-[24ch] text-[15px] text-mute">{{ t }}</dt>
+        <dd class="order-1 text-[48px] font-bold leading-none tracking-[-0.03em] sm:text-[64px]">{{ n }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+  </section>
+
+  {# ================= DATOS ================= #}
+  <section id="datos" class="mx-auto max-w-[1200px] scroll-mt-16 px-4 py-20 sm:px-8 lg:py-28">
+    <div class="max-w-[60ch]" data-reveal>
+      <h2 class="text-[34px] font-bold leading-[1.08] tracking-[-0.03em] sm:text-[48px]">Cada dato vive donde mejor funciona</h2>
+      <p class="mt-5 text-[17px] leading-relaxed text-mute">
+        Una factura no admite errores a medias. Un catálogo se consulta todo el día y casi nunca cambia. Por eso SIFAT usa dos bases de datos distintas.
+      </p>
+    </div>
+
+    <div class="mt-12 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+      <article class="lift rounded-3xl border border-line bg-panel p-7 sm:p-9" data-reveal>
+        <h3 class="text-[24px] font-bold tracking-tight">Facturación en MySQL</h3>
+        <p class="mt-2 max-w-[48ch] text-[16px] text-mute">Clientes, facturas, conceptos y pagos se guardan juntos o no se guardan. Si algo falla, todo se revierte.</p>
+        <ul class="mt-6 space-y-3 text-[16px]">
+          <li class="flex gap-3"><span class="mt-2.5 h-px w-4 shrink-0 bg-soft"></span>Una factura no puede existir sin cliente.</li>
+          <li class="flex gap-3"><span class="mt-2.5 h-px w-4 shrink-0 bg-soft"></span>Impuestos y totales se calculan en una sola transacción.</li>
+          <li class="flex gap-3"><span class="mt-2.5 h-px w-4 shrink-0 bg-soft"></span>Reportes de ventas y saldos con consultas entre tablas.</li>
+        </ul>
+        <p class="mt-7 flex flex-wrap gap-2 font-mono text-[12.5px] text-mute" aria-label="Tablas en MySQL">
+          {% for t in ['clientes','facturas','detalle_factura','pagos','usuarios','impuestos','formas_pago','metodos_pago','regimenes_fiscales','usos_cfdi'] %}
+          <span class="rounded-md border border-line px-2 py-1">{{ t }}</span>
+          {% endfor %}
+        </p>
+      </article>
+
+      <article class="lift rounded-3xl bg-violet p-7 sm:p-9" data-reveal>
+        <h3 class="text-[24px] font-bold tracking-tight">Catálogo en DynamoDB</h3>
+        <p class="mt-2 text-[16px] text-white/90">Cada servicio es un documento con sus características adentro. Se lee por su clave en milisegundos.</p>
+        <pre class="mt-6 overflow-x-auto rounded-2xl bg-black/35 p-4 font-mono text-[13px] leading-relaxed text-white/90"><code>{
+  "id_servicio": "SRV-001",
+  "nombre": "Hosting Basico",
+  "precio_unitario": 349,
+  "impuesto": { "nombre": "IVA", "tasa": 0.16 },
+  "caracteristicas": [ … ]
+}</code></pre>
+        <p class="mt-5 text-[15px] text-white/90">Un servicio de hosting y una auditoría de seguridad pueden tener atributos distintos sin columnas vacías.</p>
+      </article>
+    </div>
+  </section>
+
+  {# ================= ACCESO ================= #}
+  <section id="acceso" class="relative scroll-mt-16 overflow-hidden bg-violet" aria-labelledby="acc-titulo">
+    <div class="dither-bg pointer-events-none absolute inset-0" aria-hidden="true"></div>
+    <div class="relative mx-auto grid max-w-[1200px] items-center gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_440px] lg:py-28">
+      <div data-reveal>
+        <h2 id="acc-titulo" class="max-w-[16ch] text-[40px] font-bold leading-[1.04] tracking-[-0.035em] sm:text-[60px]">Entra y factura</h2>
+        <p class="mt-5 max-w-[42ch] text-[17px] leading-relaxed text-white/90">Con tu cuenta ves el catálogo, tus facturas y tus clientes en una sola vista.</p>
+      </div>
+
+      <form action="{{ url_for('catalogo') }}" method="get" class="rounded-3xl border border-line bg-ink p-7 sm:p-8" data-reveal>
+        <h3 class="text-[24px] font-bold tracking-tight">Iniciar sesión</h3>
+        <div class="mt-6 space-y-4">
+          <div>
+            <label class="label" for="login-email">Correo electrónico</label>
+            <input id="login-email" type="email" autocomplete="username" class="field field-lg" placeholder="nombre@empresa.com" spellcheck="false">
+          </div>
+          <div>
+            <label class="label" for="login-pass">Contraseña</label>
+            <div class="relative">
+              <input id="login-pass" type="password" autocomplete="current-password" class="field field-lg field-pr">
+              <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="login-pass" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg mt-6 w-full justify-center">Entrar</button>
+        <p class="mt-4 text-[14px] text-mute">Es una demo: por ahora el acceso no valida credenciales y te lleva directo al catálogo.</p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="border-t border-line">
+  <div class="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-8 text-[14px] text-mute sm:px-8">
+    <p>SIFAT · Sistema de facturación · UTEZ, Optativa 1</p>
+    <p>Equipo 1</p>
+  </div>
+</footer>
+{% endblock %}

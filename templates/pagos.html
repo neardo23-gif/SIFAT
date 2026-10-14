@@ -1,0 +1,44 @@
+{% extends "app_base.html" %}
+{% block title %}Pagos · SIFAT{% endblock %}
+
+{% block main %}
+<h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Pagos</h1>
+<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Cada pago se liga a una factura y a una forma de pago del SAT. Aquí se muestran datos de ejemplo.</p>
+
+<section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-pag">
+  <h2 id="t-pag" class="sr-only">Lista de pagos</h2>
+  {% if pagos %}
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[620px] text-left text-[15px]">
+      <caption class="sr-only">Pagos registrados</caption>
+      <thead>
+        <tr class="border-b border-line text-[13px] text-mute">
+          <th scope="col" class="px-4 py-3 font-medium">Factura</th>
+          <th scope="col" class="px-4 py-3 font-medium">Fecha</th>
+          <th scope="col" class="px-4 py-3 font-medium">Forma de pago</th>
+          <th scope="col" class="px-4 py-3 font-medium">Referencia</th>
+          <th scope="col" class="px-4 py-3 text-right font-medium">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pagos %}
+        <tr class="row">
+          <td class="px-4 py-3.5 font-mono text-[13px]">{{ p.folio }}</td>
+          <td class="whitespace-nowrap px-4 py-3.5 text-mute">{{ p.fecha }}</td>
+          <td class="px-4 py-3.5">{{ p.forma }}</td>
+          <td class="px-4 py-3.5 text-mute">{{ p.referencia }}</td>
+          <td class="px-4 py-3.5 text-right font-semibold tabular-nums">{{ p.monto|mxn }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="px-6 py-16 text-center">
+    <div class="dither-chip mx-auto mb-5" aria-hidden="true"></div>
+    <p class="text-[17px] font-semibold">Todavía no hay pagos</p>
+    <p class="mx-auto mt-1 max-w-[40ch] text-[15px] text-mute">Cuando registres un pago aparecerá aquí, ligado a su factura.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

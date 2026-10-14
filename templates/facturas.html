@@ -1,0 +1,42 @@
+{% extends "app_base.html" %}
+{% block title %}Facturas · SIFAT{% endblock %}
+
+{% block main %}
+<h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Facturas</h1>
+<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Se guardan en MySQL con su detalle y pagos. Aquí se muestran datos de ejemplo.</p>
+
+<section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-fact">
+  <h2 id="t-fact" class="sr-only">Lista de facturas</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[680px] text-left text-[15px]">
+      <caption class="sr-only">Facturas emitidas</caption>
+      <thead>
+        <tr class="border-b border-line text-[13px] text-mute">
+          <th scope="col" class="px-4 py-3 font-medium">Folio</th>
+          <th scope="col" class="px-4 py-3 font-medium">Cliente</th>
+          <th scope="col" class="px-4 py-3 font-medium">Emisión</th>
+          <th scope="col" class="px-4 py-3 text-right font-medium">Subtotal</th>
+          <th scope="col" class="px-4 py-3 text-right font-medium">Total</th>
+          <th scope="col" class="px-4 py-3 font-medium">Estatus</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in facturas %}
+        <tr class="row">
+          <td class="px-4 py-3.5 font-mono text-[13px]">{{ f.folio }}</td>
+          <td class="px-4 py-3.5 font-medium">{{ f.cliente }}</td>
+          <td class="whitespace-nowrap px-4 py-3.5 text-mute">{{ f.fecha }}</td>
+          <td class="px-4 py-3.5 text-right tabular-nums text-mute">{{ f.subtotal|mxn }}</td>
+          <td class="px-4 py-3.5 text-right font-semibold tabular-nums">{{ f.total|mxn }}</td>
+          <td class="px-4 py-3.5">
+            {% if f.estatus == 'pagada' %}<span class="chip"><span class="dot bg-soft"></span>Pagada</span>
+            {% elif f.estatus == 'vigente' %}<span class="chip"><span class="dot bg-sello"></span>Por cobrar</span>
+            {% else %}<span class="chip text-mute"><span class="dot border border-mute"></span>Cancelada</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
