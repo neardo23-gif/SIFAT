@@ -170,6 +170,8 @@
     // atributos que no todos los servicios tienen (esquema flexible)
     if (s.duracion_estimada_dias) datos.append(dato('Duración estimada', `${s.duracion_estimada_dias} días`));
     if (s.requiere_contrato_confidencialidad) datos.append(dato('Confidencialidad', 'Requiere contrato'));
+    // un servicio inactivo ya está dado de baja
+    $('#det-borrar').classList.toggle('hidden', !s.activo);
 
     const lista = $('#det-caract');
     lista.replaceChildren();
@@ -255,7 +257,7 @@
     }).filter((c) => c.nombre);
     return {
       id_servicio: $('#f-id').value.trim(),
-      clave: $('#f-clave').value.trim(),
+      clave: $('#f-clave').value.trim().toUpperCase(),
       nombre: $('#f-nombre').value.trim(),
       descripcion: $('#f-desc').value.trim(),
       categoria: $('#f-cat').value.trim(),
@@ -269,11 +271,13 @@
 
   function validar(d) {
     const malos = [];
-    if (!/^SRV-\d{3,}$/.test(d.id_servicio)) malos.push('#f-id');
-    if (!d.clave) malos.push('#f-clave');
+    if (!/^SRV-\d{3,6}$/.test(d.id_servicio)) malos.push('#f-id');
+    if (!/^[A-Z0-9-]{1,20}$/.test(d.clave)) malos.push('#f-clave');
     if (!d.nombre) malos.push('#f-nombre');
     if (!d.categoria) malos.push('#f-cat');
-    if (!(d.precio_unitario >= 0)) malos.push('#f-precio');
+    // mismo rango y máximo 2 decimales que valida la Lambda
+    if (!(d.precio_unitario >= 0 && d.precio_unitario <= 10000000) ||
+        !/^\d+(\.\d{1,2})?$/.test($('#f-precio').value.trim())) malos.push('#f-precio');
     return malos;
   }
 
@@ -284,7 +288,7 @@
     const malos = validar(d);
     if (malos.length) {
       malos.forEach((sel) => $(sel).setAttribute('aria-invalid', 'true'));
-      formError.textContent = 'Revisa los campos marcados: identificador (SRV-000), clave, nombre, categoría y precio son obligatorios.';
+      formError.textContent = 'Revisa los campos marcados: identificador (SRV-000), clave (letras, números y guiones), nombre, categoría y precio (máximo 2 decimales) son obligatorios.';
       formError.classList.remove('hidden');
       $(malos[0]).focus();
       return;
@@ -330,18 +334,18 @@
   formBorrar.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (inputConfirma.value.trim() !== actual.id_servicio) return;
-    btnBorrar.disabled = true; btnBorrar.textContent = 'Eliminando…';
+    btnBorrar.disabled = true; btnBorrar.textContent = 'Dando de baja…';
     try {
       const res = await fetch('/api/servicios?id_servicio=' + encodeURIComponent(actual.id_servicio), { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.mensaje || `Error ${res.status}`);
-      try { sessionStorage.setItem('sifat-toast', 'Servicio eliminado'); } catch (_) {}
+      try { sessionStorage.setItem('sifat-toast', 'Servicio dado de baja'); } catch (_) {}
       location.reload();
     } catch (err) {
       const box = $('#borrar-error');
       box.textContent = err.message + '.';
       box.classList.remove('hidden');
-      btnBorrar.disabled = false; btnBorrar.textContent = 'Eliminar servicio';
+      btnBorrar.disabled = false; btnBorrar.textContent = 'Dar de baja';
     }
   });
 
