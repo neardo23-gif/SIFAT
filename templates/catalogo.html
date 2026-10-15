@@ -116,7 +116,7 @@
     <ul id="det-caract" class="mt-3 divide-y divide-line rounded-xl border border-line"></ul>
   </div>
   <div class="flex flex-wrap justify-between gap-2 border-t border-line p-4">
-    <button type="button" class="btn btn-danger" data-action="pedir-borrar">{{ icon('borrar') }}Eliminar</button>
+    <button type="button" class="btn btn-danger" data-action="pedir-borrar" id="det-borrar">{{ icon('borrar') }}Dar de baja</button>
     <div class="flex gap-2">
       <button type="button" class="btn btn-ghost" data-close>Cerrar</button>
       <button type="button" class="btn btn-primary" data-action="editar">{{ icon('editar') }}Editar</button>
@@ -135,12 +135,12 @@
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label class="label" for="f-id">Identificador</label>
-          <input id="f-id" name="id_servicio" class="field font-mono" placeholder="SRV-013" required pattern="SRV-[0-9]{3,}" autocomplete="off">
+          <input id="f-id" name="id_servicio" class="field font-mono" placeholder="SRV-013" required pattern="SRV-[0-9]{3,6}" autocomplete="off">
           <p class="hint">Formato SRV-000. No se puede cambiar después.</p>
         </div>
         <div>
           <label class="label" for="f-clave">Clave</label>
-          <input id="f-clave" name="clave" class="field font-mono" placeholder="HOST-BAS" required autocomplete="off">
+          <input id="f-clave" name="clave" class="field font-mono" style="text-transform: uppercase" placeholder="HOST-BAS" required autocomplete="off" maxlength="20">
         </div>
       </div>
       <div>
@@ -193,14 +193,14 @@
 <dialog id="dlg-borrar" class="modal w-[min(520px,calc(100vw-2rem))]" aria-labelledby="borrar-titulo">
   <form id="form-borrar" novalidate>
     <div class="p-6">
-      <h2 id="borrar-titulo" class="text-[22px] font-bold tracking-tight">¿Eliminar este servicio?</h2>
+      <h2 id="borrar-titulo" class="text-[22px] font-bold tracking-tight">¿Dar de baja este servicio?</h2>
       <p class="mt-2 text-[15px] text-mute">
-        Se elimina <strong class="font-semibold text-[#f2f2f2]" id="borrar-nombre"></strong> del catálogo.
+        <strong class="font-semibold text-[#f2f2f2]" id="borrar-nombre"></strong> queda inactivo y ya no se podrá agregar a nuevas facturas.
         Las facturas ya emitidas conservan su copia del precio.
       </p>
       <div class="mt-4 flex items-start gap-2.5 rounded-xl border border-sello/40 bg-sello/10 px-3.5 py-3 text-[14px]">
         <span class="mt-px text-sello">{{ icon('alerta', 'h-4 w-4') }}</span>
-        <p>Esta acción no se puede deshacer.</p>
+        <p>El servicio no se borra: se conserva como historial. Para volver a usarlo, edítalo y marca “Disponible para facturar”.</p>
       </div>
       <label class="label mt-5" for="borrar-confirma">Para confirmar, escribe <span class="font-mono text-[#f2f2f2]" id="borrar-id"></span></label>
       <input id="borrar-confirma" class="field font-mono" autocomplete="off" spellcheck="false">
@@ -208,7 +208,7 @@
     </div>
     <div class="flex justify-between gap-2 border-t border-line p-4">
       <button type="button" class="btn btn-light" data-close>Cancelar</button>
-      <button type="submit" class="btn btn-danger" id="borrar-submit" disabled>Eliminar servicio</button>
+      <button type="submit" class="btn btn-danger" id="borrar-submit" disabled>Dar de baja</button>
     </div>
   </form>
 </dialog>
