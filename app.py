@@ -13,6 +13,8 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from mock_data import CLIENTES, FACTURAS, PAGOS, SERVICIOS
 
+MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -25,6 +27,10 @@ USE_MOCK = os.getenv("USE_MOCK", "true").lower() == "true"
 # La clave solo vive en el servidor: el navegador nunca la ve.
 API_KEY = os.getenv("API_KEY", "").strip()
 TIMEOUT = 8
+
+# Backend propio (repo SIFAT-BACKEND): clientes, facturas y pagos en MySQL
+BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
+BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "").strip()
 LIMITE_PAGINA = 50  # máximo que acepta la Lambda por página
 MAX_PAGINAS = 20  # tope de seguridad: hasta 1000 servicios por carga
 
@@ -83,11 +89,40 @@ def listar_servicios():
 
 
 def contexto_base(active):
+    origen = "API Gateway" if active == "catalogo" else "Backend (MySQL)"
     return {
         "active": active,
-        "origen": "Datos de ejemplo" if USE_MOCK else "API Gateway",
+        "origen": "Datos de ejemplo" if USE_MOCK else origen,
         "usa_mock": USE_MOCK,
     }
+
+
+def _fecha(valor):
+    """'2026-10-14T18:30:00' -> '14 oct 2026'."""
+    try:
+        anio, mes, dia = str(valor)[:10].split("-")
+        return f"{int(dia):02d} {MESES[int(mes) - 1]} {anio}"
+    except (ValueError, IndexError):
+        return "-"
+
+
+def consultar_backend(ruta, llave):
+    """Devuelve (lista, error). Nunca lanza: la pantalla muestra el error."""
+    if not BACKEND_API_KEY:
+        return [], "Falta configurar BACKEND_API_KEY en el archivo .env."
+    try:
+        r = requests.get(f"{BACKEND_URL}{ruta}", params={"limite": 200},
+                         headers={"X-API-Key": BACKEND_API_KEY}, timeout=TIMEOUT)
+    except requests.RequestException as exc:
+        return [], f"No se pudo contactar al backend en {BACKEND_URL} ({exc.__class__.__name__}). ¿Está encendido?"
+    if r.status_code == 401:
+        return [], "El backend rechazó la clave: revisa que BACKEND_API_KEY sea igual en ambos .env."
+    if r.status_code != 200:
+        return [], f"El backend respondió {r.status_code}."
+    try:
+        return r.json().get(llave, []), None
+    except ValueError:
+        return [], "El backend devolvió una respuesta inválida."
 
 
 @app.route("/")
@@ -110,17 +145,35 @@ def catalogo():
 
 @app.route("/facturas")
 def facturas():
-    return render_template("facturas.html", facturas=FACTURAS, **contexto_base("facturas"))
+    if USE_MOCK:
+        return render_template("facturas.html", facturas=FACTURAS, **contexto_base("facturas"))
+    datos, error = consultar_backend("/facturas", "facturas")
+    filas = [{"folio": f["folio"], "cliente": f["cliente"], "fecha": _fecha(f["fecha_emision"]),
+              "subtotal": f["subtotal"], "iva": f["iva"], "total": f["total"],
+              "estatus": f["estatus"]} for f in datos]
+    return render_template("facturas.html", facturas=filas, error=error, **contexto_base("facturas"))
 
 
 @app.route("/clientes")
 def clientes():
-    return render_template("clientes.html", clientes=CLIENTES, **contexto_base("clientes"))
+    if USE_MOCK:
+        return render_template("clientes.html", clientes=CLIENTES, **contexto_base("clientes"))
+    datos, error = consultar_backend("/clientes", "clientes")
+    filas = [{"id": f"CLI-{c['id_cliente']:03d}", "razon_social": c["razon_social"], "rfc": c["rfc"],
+              "cp": c["cp_fiscal"], "email": c.get("email") or "-", "activo": c["activo"]}
+             for c in datos]
+    return render_template("clientes.html", clientes=filas, error=error, **contexto_base("clientes"))
 
 
 @app.route("/pagos")
 def pagos():
-    return render_template("pagos.html", pagos=PAGOS, **contexto_base("pagos"))
+    if USE_MOCK:
+        return render_template("pagos.html", pagos=PAGOS, **contexto_base("pagos"))
+    datos, error = consultar_backend("/pagos", "pagos")
+    filas = [{"id": p["id_pago"], "folio": p["folio"], "fecha": _fecha(p["fecha_pago"]),
+              "forma": f"{p['clave_forma_pago']} {p['forma_pago']}", "monto": p["monto"],
+              "referencia": p.get("referencia") or "-"} for p in datos]
+    return render_template("pagos.html", pagos=filas, error=error, **contexto_base("pagos"))
 
 
 @app.route("/api/servicios", methods=["POST", "PUT", "DELETE"])

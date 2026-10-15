@@ -3,7 +3,16 @@
 
 {% block main %}
 <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Facturas</h1>
-<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Se guardan en MySQL con su detalle y pagos. Aquí se muestran datos de ejemplo.</p>
+<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Se guardan en MySQL con su detalle y pagos. Origen: {{ origen }}.</p>
+{% if error %}
+<div class="mt-6 flex items-start gap-3 rounded-xl border border-sello/40 bg-sello/10 p-4 text-[15px]" role="alert">
+  <div>
+    <p class="font-semibold">No pudimos cargar los datos</p>
+    <p class="text-mute">{{ error }}</p>
+  </div>
+</div>
+{% endif %}
+
 
 <section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-fact">
   <h2 id="t-fact" class="sr-only">Lista de facturas</h2>
