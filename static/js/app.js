@@ -6,6 +6,7 @@
   const money = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
   /** Crea un elemento sin usar innerHTML (los datos vienen de la API). */
   function h(tag, className, text) {
@@ -241,6 +242,11 @@
       $('#f-precio').value = s.precio_unitario;
       $('#f-unidad').value = s.unidad_medida || 'Servicio';
       $('#f-activo').checked = !!s.activo;
+      // preselecciona el impuesto actual del servicio, si existe en el catálogo
+      if (s.impuesto) {
+        const clave = `${s.impuesto.nombre}|${Number(s.impuesto.tasa).toFixed(4)}|${s.impuesto.tipo}`;
+        if ($(`#f-impuesto option[value="${CSS.escape(clave)}"]`)) $('#f-impuesto').value = clave;
+      }
       (s.caracteristicas || []).forEach((c) => cList.append(filaCaract(c)));
     } else {
       id.value = siguienteId();
@@ -264,7 +270,8 @@
       precio_unitario: parseFloat($('#f-precio').value),
       unidad_medida: $('#f-unidad').value,
       activo: $('#f-activo').checked,
-      impuesto: { nombre: 'IVA', tasa: 0.16, tipo: 'traslado' },
+      // solo se manda cuál impuesto; la tasa la pone el servidor
+      impuesto_clave: $('#f-impuesto').value,
       caracteristicas,
     };
   }
@@ -275,6 +282,7 @@
     if (!/^[A-Z0-9-]{1,20}$/.test(d.clave)) malos.push('#f-clave');
     if (!d.nombre) malos.push('#f-nombre');
     if (!d.categoria) malos.push('#f-cat');
+    if (!d.impuesto_clave) malos.push('#f-impuesto');
     // mismo rango y máximo 2 decimales que valida la Lambda
     if (!(d.precio_unitario >= 0 && d.precio_unitario <= 10000000) ||
         !/^\d+(\.\d{1,2})?$/.test($('#f-precio').value.trim())) malos.push('#f-precio');
@@ -299,7 +307,7 @@
     try {
       const res = await fetch('/api/servicios', {
         method: modo === 'crear' ? 'POST' : 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
         body: JSON.stringify(d),
       });
       const data = await res.json().catch(() => ({}));
@@ -336,7 +344,9 @@
     if (inputConfirma.value.trim() !== actual.id_servicio) return;
     btnBorrar.disabled = true; btnBorrar.textContent = 'Dando de baja…';
     try {
-      const res = await fetch('/api/servicios?id_servicio=' + encodeURIComponent(actual.id_servicio), { method: 'DELETE' });
+      const res = await fetch('/api/servicios?id_servicio=' + encodeURIComponent(actual.id_servicio), {
+        method: 'DELETE', headers: { 'X-CSRF-Token': csrf },
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.mensaje || `Error ${res.status}`);
       try { sessionStorage.setItem('sifat-toast', 'Servicio dado de baja'); } catch (_) {}

@@ -164,7 +164,7 @@
         <div>
           <label class="label" for="f-unidad">Unidad</label>
           <select id="f-unidad" name="unidad_medida" class="field">
-            <option>Servicio</option><option>Mes</option><option>Ano</option><option>Hora</option><option>Pieza</option>
+            {% for u in unidades %}<option>{{ u }}</option>{% endfor %}
           </select>
         </div>
       </div>
@@ -173,7 +173,12 @@
           <input id="f-activo" name="activo" type="checkbox" class="h-4 w-4 accent-[#6b49f0]" checked>
           Disponible para facturar
         </label>
-        <p class="text-mute">Impuesto: IVA 16% (traslado)</p>
+        <div class="flex items-center gap-2">
+          <label for="f-impuesto" class="text-mute">Impuesto</label>
+          <select id="f-impuesto" name="impuesto_clave" class="field w-auto" required>
+            {% for i in impuestos %}<option value="{{ i.clave }}">{{ i.etiqueta }}</option>{% endfor %}
+          </select>
+        </div>
       </div>
       <fieldset>
         <legend class="label">Características</legend>
