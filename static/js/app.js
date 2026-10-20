@@ -172,7 +172,7 @@
     if (s.duracion_estimada_dias) datos.append(dato('Duración estimada', `${s.duracion_estimada_dias} días`));
     if (s.requiere_contrato_confidencialidad) datos.append(dato('Confidencialidad', 'Requiere contrato'));
     // un servicio inactivo ya está dado de baja
-    $('#det-borrar').classList.toggle('hidden', !s.activo);
+    $('#det-borrar')?.classList.toggle('hidden', !s.activo);
 
     const lista = $('#det-caract');
     lista.replaceChildren();

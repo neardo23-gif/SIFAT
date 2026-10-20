@@ -12,7 +12,7 @@ import os
 import pytest
 
 import app as sifat
-from conftest import html
+from conftest import con_csrf, html
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SIFAT_PRUEBAS_REALES") != "1",
@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(
 def cliente_real(monkeypatch):
     monkeypatch.setattr(sifat, "USE_MOCK", False)
     sifat.app.config.update(TESTING=True)
-    return sifat.app.test_client()
+    return con_csrf(sifat.app.test_client())
 
 
 def test_api_gateway_lista_servicios():

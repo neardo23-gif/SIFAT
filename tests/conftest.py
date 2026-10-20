@@ -23,10 +23,15 @@ CLAVE_IVA = "IVA|0.1600|traslado"
 CSRF = "token-csrf-de-prueba"
 
 
-def con_csrf(cliente):
-    """Simula una sesión abierta: el token vive en la cookie y se manda en el header."""
+ADMIN = {"id_usuario": 1, "nombre": "Ana Lopez", "email": "ana.lopez@sifat.mx", "rol": "Administrador"}
+
+
+def con_csrf(cliente, usuario=ADMIN):
+    """Simula una sesión iniciada: usuario y token en la cookie, token en el header."""
     with cliente.session_transaction() as s:
         s["csrf"] = CSRF
+        if usuario:
+            s["usuario"] = usuario
     cliente.environ_base["HTTP_X_CSRF_TOKEN"] = CSRF
     return cliente
 
@@ -78,6 +83,9 @@ class RedFalsa:
             return RespuestaFalsa(200, {"impuestos": [IMPUESTO_IVA]})
         return self._siguiente("GET", url, **kwargs)
 
+    def post(self, url, **kwargs):
+        return self._siguiente("POST", url, **kwargs)
+
     def request(self, metodo, url, **kwargs):
         return self._siguiente(metodo, url, **kwargs)
 
@@ -87,6 +95,7 @@ def red(monkeypatch):
     falsa = RedFalsa()
     monkeypatch.setattr(sifat.requests, "get", falsa.get)
     monkeypatch.setattr(sifat.requests, "request", falsa.request)
+    monkeypatch.setattr(sifat.requests, "post", falsa.post)
     return falsa
 
 
@@ -119,3 +128,20 @@ def modo_real(monkeypatch, red):
 
 def html(respuesta):
     return respuesta.get_data(as_text=True)
+
+
+@pytest.fixture(autouse=True)
+def limite_ip_limpio(monkeypatch):
+    monkeypatch.setattr(sifat, "_intentos_ip", __import__("collections").defaultdict(__import__("collections").deque))
+
+
+@pytest.fixture
+def sin_sesion(monkeypatch, red):
+    """App real (red simulada) sin nadie autenticado."""
+    monkeypatch.setattr(sifat, "USE_MOCK", False)
+    monkeypatch.setattr(sifat, "API_BASE_URL", "https://gateway.test/dev")
+    monkeypatch.setattr(sifat, "API_KEY", "clave-gateway-prueba")
+    monkeypatch.setattr(sifat, "BACKEND_URL", "http://backend.test")
+    monkeypatch.setattr(sifat, "BACKEND_API_KEY", "clave-backend-prueba")
+    sifat.app.config.update(TESTING=True)
+    return con_csrf(sifat.app.test_client(), usuario=None)

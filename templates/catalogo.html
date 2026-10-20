@@ -10,9 +10,9 @@
       Lo que puedes agregar a una factura. Cada servicio se lee de DynamoDB con una sola consulta.
     </p>
   </div>
-  <button type="button" class="btn btn-primary" data-action="nuevo">
+  {% if puede_editar %}<button type="button" class="btn btn-primary" data-action="nuevo">
     {{ icon('mas') }}Nuevo servicio
-  </button>
+  </button>{% endif %}
 </div>
 
 {% if error %}
@@ -116,10 +116,10 @@
     <ul id="det-caract" class="mt-3 divide-y divide-line rounded-xl border border-line"></ul>
   </div>
   <div class="flex flex-wrap justify-between gap-2 border-t border-line p-4">
-    <button type="button" class="btn btn-danger" data-action="pedir-borrar" id="det-borrar">{{ icon('borrar') }}Dar de baja</button>
+    {% if puede_editar %}<button type="button" class="btn btn-danger" data-action="pedir-borrar" id="det-borrar">{{ icon('borrar') }}Dar de baja</button>{% else %}<span></span>{% endif %}
     <div class="flex gap-2">
       <button type="button" class="btn btn-ghost" data-close>Cerrar</button>
-      <button type="button" class="btn btn-primary" data-action="editar">{{ icon('editar') }}Editar</button>
+      {% if puede_editar %}<button type="button" class="btn btn-primary" data-action="editar">{{ icon('editar') }}Editar</button>{% endif %}
     </div>
   </div>
 </dialog>

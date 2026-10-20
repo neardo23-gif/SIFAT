@@ -11,7 +11,7 @@
     <nav class="flex items-center gap-1 sm:gap-2" aria-label="Principal">
       <a href="#datos" class="top-link hidden sm:inline-flex">Cómo se guardan los datos</a>
       <a href="#acceso" class="top-link hidden sm:inline-flex">Acceso</a>
-      <a href="{{ url_for('catalogo') }}" class="btn btn-light btn-sm">Abrir catálogo</a>
+      <a href="{{ url_for('catalogo') if usuario_actual() else '#acceso' }}" class="btn btn-light btn-sm">{{ 'Abrir catálogo' if usuario_actual() else 'Iniciar sesión' }}</a>
     </nav>
   </div>
 </header>
@@ -28,7 +28,7 @@
         SIFAT junta clientes, servicios, facturas y pagos en un solo lugar. Los servicios se consultan al instante y la facturación queda protegida por transacciones.
       </p>
       <div class="mt-9 flex flex-wrap items-center gap-3">
-        <a href="{{ url_for('catalogo') }}" class="btn btn-primary btn-lg">Abrir catálogo</a>
+        <a href="{{ url_for('catalogo') if usuario_actual() else '#acceso' }}" class="btn btn-primary btn-lg">{{ 'Abrir catálogo' if usuario_actual() else 'Iniciar sesión' }}</a>
         <a href="#datos" class="btn btn-ghost btn-lg">Ver cómo se guardan los datos</a>
       </div>
     </div>
@@ -132,24 +132,36 @@
         <p class="mt-5 max-w-[42ch] text-[17px] leading-relaxed text-white/90">Con tu cuenta ves el catálogo, tus facturas y tus clientes en una sola vista.</p>
       </div>
 
-      <form action="{{ url_for('catalogo') }}" method="get" class="rounded-3xl border border-line bg-ink p-7 sm:p-8" data-reveal>
+      {% if usuario_actual() %}
+      <div class="rounded-3xl border border-line bg-ink p-7 sm:p-8" data-reveal>
+        <h3 class="text-[24px] font-bold tracking-tight">Hola, {{ usuario_actual().nombre }}</h3>
+        <p class="mt-2 text-[15px] text-mute">Ya iniciaste sesión como {{ usuario_actual().rol }}.</p>
+        <a href="{{ url_for('catalogo') }}" class="btn btn-primary btn-lg mt-6 w-full justify-center">Ir al catálogo</a>
+      </div>
+      {% else %}
+      <form action="{{ url_for('login') }}" method="post" class="rounded-3xl border border-line bg-ink p-7 sm:p-8" data-reveal>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <h3 class="text-[24px] font-bold tracking-tight">Iniciar sesión</h3>
+        {% if error_login %}
+        <p class="mt-4 rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert">{{ error_login }}</p>
+        {% endif %}
         <div class="mt-6 space-y-4">
           <div>
             <label class="label" for="login-email">Correo electrónico</label>
-            <input id="login-email" type="email" autocomplete="username" class="field field-lg" placeholder="nombre@empresa.com" spellcheck="false">
+            <input id="login-email" name="email" type="email" autocomplete="username" class="field field-lg" placeholder="nombre@empresa.com" spellcheck="false" required maxlength="120" value="{{ email or '' }}">
           </div>
           <div>
             <label class="label" for="login-pass">Contraseña</label>
             <div class="relative">
-              <input id="login-pass" type="password" autocomplete="current-password" class="field field-lg field-pr">
+              <input id="login-pass" name="password" type="password" autocomplete="current-password" class="field field-lg field-pr" required maxlength="128">
               <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="login-pass" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
             </div>
           </div>
         </div>
         <button type="submit" class="btn btn-primary btn-lg mt-6 w-full justify-center">Entrar</button>
-        <p class="mt-4 text-[14px] text-mute">Es una demo: por ahora el acceso no valida credenciales y te lleva directo al catálogo.</p>
+        <p class="mt-4 text-[14px] text-mute">Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.</p>
       </form>
+      {% endif %}
     </div>
   </section>
 </main>

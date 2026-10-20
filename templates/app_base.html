@@ -30,6 +30,14 @@
       </ul>
     </nav>
     <div class="border-t border-line px-5 py-4 text-[13px]">
+      {% if usuario_actual() %}
+      <p class="font-semibold text-[#f2f2f2]">{{ usuario_actual().nombre }}</p>
+      <p class="text-mute">{{ usuario_actual().rol }}</p>
+      <form action="{{ url_for('logout') }}" method="post" class="mb-3 mt-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-ghost btn-sm w-full justify-center">Cerrar sesión</button>
+      </form>
+      {% endif %}
       <p class="flex items-center gap-2 text-mute">
         <span class="h-1.5 w-1.5 rounded-full {{ 'bg-sello' if usa_mock else 'bg-soft' }}" aria-hidden="true"></span>
         Origen: <span class="text-[#f2f2f2]">{{ origen }}</span>
@@ -43,7 +51,10 @@
         <a href="{{ url_for('landing') }}" class="logo inline-flex items-center gap-2.5 text-[17px] font-bold tracking-tight">
           <span class="logo-mark" aria-hidden="true"></span>SIFAT
         </a>
-        <span class="text-[13px] text-mute">{{ origen }}</span>
+        <form action="{{ url_for('logout') }}" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-ghost btn-sm">Salir</button>
+        </form>
       </div>
       <nav class="no-scrollbar flex gap-1 overflow-x-auto px-3 pb-2" aria-label="Navegación principal">
         {% for key, label, href in nav %}

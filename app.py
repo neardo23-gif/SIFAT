@@ -8,11 +8,14 @@ import hmac
 import logging
 import os
 import secrets
-from datetime import datetime, timezone
+import time
+from collections import defaultdict, deque
+from datetime import datetime, timedelta, timezone
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, render_template, request, session
+from flask import (Flask, Response, jsonify, redirect, render_template, request, session,
+                   url_for)
 
 from mock_data import CLIENTES, FACTURAS, IVA, PAGOS, SERVICIOS
 
@@ -27,7 +30,13 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "").strip() or secrets.token_hex(32)
 if not os.getenv("SECRET_KEY", "").strip():
     log.warning("SECRET_KEY no está en .env: se generó una temporal (las sesiones se reinician al reiniciar).")
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Strict")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Strict",
+    # true cuando el sitio se sirva por HTTPS (en producción)
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true",
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+)
 
 # Sin valores por defecto: cada entorno define sus URLs en .env
 API_BASE_URL = os.getenv("API_BASE_URL", "").strip().rstrip("/")
@@ -140,6 +149,76 @@ def consultar_backend(ruta, llave):
         return [], "El backend devolvió una respuesta inválida."
 
 
+# ---------------- Sesión y permisos ----------------
+RUTAS_PUBLICAS = {"landing", "login", "static"}
+ROL_EDITA_CATALOGO = "Administrador"
+
+
+def usuario_actual():
+    return session.get("usuario")
+
+
+app.jinja_env.globals["usuario_actual"] = usuario_actual
+
+
+@app.before_request
+def exigir_sesion():
+    if request.endpoint in RUTAS_PUBLICAS or request.endpoint is None:
+        return None
+    if usuario_actual():
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify({"mensaje": "Inicia sesión para continuar"}), 401
+    return redirect(url_for("landing", _anchor="acceso"))
+
+
+@app.after_request
+def cabeceras_seguras(respuesta):
+    respuesta.headers["X-Content-Type-Options"] = "nosniff"
+    respuesta.headers["X-Frame-Options"] = "DENY"
+    respuesta.headers["Referrer-Policy"] = "same-origin"
+    if usuario_actual():
+        respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
+
+
+# Límite por IP además del bloqueo por cuenta del backend
+INTENTOS_POR_IP = 10
+VENTANA_SEGUNDOS = 15 * 60
+_intentos_ip = defaultdict(deque)
+
+
+def demasiados_intentos(ip):
+    ahora = time.monotonic()
+    cola = _intentos_ip[ip]
+    while cola and ahora - cola[0] > VENTANA_SEGUNDOS:
+        cola.popleft()
+    if len(cola) >= INTENTOS_POR_IP:
+        return True
+    cola.append(ahora)
+    return False
+
+
+def autenticar(email, password):
+    """Devuelve (usuario, error)."""
+    if USE_MOCK:
+        return None, "El inicio de sesión necesita el backend: pon USE_MOCK=false."
+    if not BACKEND_URL or not BACKEND_API_KEY:
+        return None, "Falta configurar BACKEND_URL o BACKEND_API_KEY en el archivo .env."
+    try:
+        r = requests.post(f"{BACKEND_URL}/auth/login", json={"email": email, "password": password},
+                          headers={"X-API-Key": BACKEND_API_KEY}, timeout=TIMEOUT)
+    except requests.RequestException:
+        return None, "No se pudo contactar al servidor. Intenta más tarde."
+    if r.status_code == 200:
+        return r.json(), None
+    if r.status_code in (401, 423):
+        return None, r.json().get("mensaje", "Correo o contraseña incorrectos")
+    if r.status_code == 400:
+        return None, "Correo o contraseña incorrectos"
+    return None, "No se pudo iniciar sesión. Intenta más tarde."
+
+
 # ---------------- Protección CSRF ----------------
 def token_csrf():
     if "csrf" not in session:
@@ -151,7 +230,7 @@ app.jinja_env.globals["csrf_token"] = token_csrf
 
 
 def csrf_valido():
-    enviado = request.headers.get("X-CSRF-Token", "")
+    enviado = request.headers.get("X-CSRF-Token", "") or request.form.get("csrf_token", "")
     guardado = session.get("csrf", "")
     return bool(enviado and guardado and hmac.compare_digest(enviado, guardado))
 
@@ -204,6 +283,34 @@ def limpiar_servicio(cuerpo, es_alta):
     return servicio, None
 
 
+@app.route("/login", methods=["POST"])
+def login():
+    if not csrf_valido():
+        return render_template("landing.html", error_login="Tu sesión expiró. Vuelve a intentarlo."), 403
+    if demasiados_intentos(request.remote_addr or "?"):
+        return render_template("landing.html", error_login="Demasiados intentos. Espera 15 minutos."), 429
+    email = request.form.get("email", "").strip().lower()[:120]
+    password = request.form.get("password", "")[:128]
+    if not email or not password:
+        return render_template("landing.html", error_login="Escribe tu correo y contraseña.", email=email), 400
+    usuario, error = autenticar(email, password)
+    if error:
+        return render_template("landing.html", error_login=error, email=email), 401
+    # Sesión nueva tras iniciar sesión: evita reutilizar una cookie anterior
+    session.clear()
+    session.permanent = True
+    session["usuario"] = {k: usuario[k] for k in ("id_usuario", "nombre", "email", "rol")}
+    session["csrf"] = secrets.token_urlsafe(32)
+    return redirect(url_for("catalogo"))
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    if csrf_valido():
+        session.clear()
+    return redirect(url_for("landing"))
+
+
 @app.route("/")
 def landing():
     return render_template("landing.html")
@@ -222,6 +329,7 @@ def catalogo():
         categorias=categorias,
         impuestos=impuestos,
         unidades=UNIDADES,
+        puede_editar=usuario_actual()["rol"] == ROL_EDITA_CATALOGO,
         error=error,
         **contexto_base("catalogo"),
     )
@@ -265,6 +373,8 @@ def api_servicios():
     """Proxy hacia API Gateway (evita CORS y mantiene la URL fuera del navegador)."""
     if not csrf_valido():
         return jsonify({"mensaje": "Sesión inválida o expirada. Recarga la página."}), 403
+    if usuario_actual()["rol"] != ROL_EDITA_CATALOGO:
+        return jsonify({"mensaje": "Solo un Administrador puede modificar el catálogo."}), 403
 
     # Solo se reenvía lo que cada método necesita
     if request.method == "DELETE":
