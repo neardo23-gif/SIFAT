@@ -3,7 +3,7 @@
 {% block title %}Clientes · SIFAT{% endblock %}
 
 {% block main %}
-{% set puede_escribir = not usa_mock and not aviso %}
+{% set puede_escribir = not aviso %}
 <div class="flex flex-wrap items-end justify-between gap-4">
   <div>
     <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Clientes</h1>
@@ -127,3 +127,5 @@
 </dialog>
 {% endif %}
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/clientes.js') }}" defer></script>{% endblock %}

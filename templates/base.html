@@ -19,6 +19,8 @@
   <a href="#contenido" class="skip-link">Saltar al contenido</a>
   {% block body %}{% endblock %}
   <div id="toasts" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-2" role="status" aria-live="polite"></div>
-  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {# comun.js primero: cada pantalla usa lo que expone en window.SIFAT (defer respeta el orden) #}
+  <script src="{{ url_for('static', filename='js/comun.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

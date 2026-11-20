@@ -6,15 +6,8 @@ y que los errores del backend lleguen al usuario en español.
 import pytest
 import requests
 
-from conftest import ADMIN, RespuestaFalsa, con_csrf, html
-
-FACTURISTA = {**ADMIN, "id_usuario": 2, "nombre": "Luis Perez", "rol": "Facturista"}
-
-
-@pytest.fixture
-def facturista(modo_real):
-    import app as sifat
-    return con_csrf(sifat.app.test_client(), usuario=FACTURISTA)
+import config
+from conftest import RespuestaFalsa, html
 
 
 # ---------------------------------------------------------------------------
@@ -162,13 +155,6 @@ def test_escrituras_rechazan_cuerpo_que_no_es_objeto(modo_real, red, metodo, rut
     assert red.llamadas == []
 
 
-@pytest.mark.parametrize("metodo, ruta, cuerpo", ESCRITURAS)
-def test_escrituras_en_modo_ejemplo_piden_el_backend(modo_mock, metodo, ruta, cuerpo):
-    r = getattr(modo_mock, metodo)(ruta, json=cuerpo)
-    assert r.status_code == 503
-    assert "necesita el backend" in r.get_json()["mensaje"]
-
-
 def test_errores_de_validacion_se_traducen(modo_real, red):
     red.responder(RespuestaFalsa(400, {"mensaje": "Datos inválidos", "errores": [
         {"campo": "rfc", "mensaje": "String should match pattern"},
@@ -247,27 +233,20 @@ def test_salud_es_publica(sin_sesion):
 
 
 def test_validar_produccion_detecta_configuracion_insegura(monkeypatch):
-    import app as sifat
     for nombre in ("SECRET_KEY", "API_KEY", "BACKEND_URL"):
-        monkeypatch.delenv(nombre, raising=False)
-    monkeypatch.setenv("FLASK_DEBUG", "true")
-    monkeypatch.setattr(sifat, "USE_MOCK", True)
-    monkeypatch.setitem(sifat.app.config, "SESSION_COOKIE_SECURE", False)
-    problemas = " | ".join(sifat.validar_produccion())
-    for texto in ("SECRET_KEY", "USE_MOCK", "SESSION_COOKIE_SECURE", "FLASK_DEBUG",
-                  "Falta API_KEY", "Falta BACKEND_URL"):
+        monkeypatch.setattr(config, nombre, "")
+    monkeypatch.setattr(config, "FLASK_DEBUG", True)
+    monkeypatch.setattr(config, "SESSION_COOKIE_SECURE", False)
+    problemas = " | ".join(config.validar_produccion())
+    for texto in ("SECRET_KEY", "SESSION_COOKIE_SECURE", "FLASK_DEBUG", "Falta API_KEY", "Falta BACKEND_URL"):
         assert texto in problemas
 
 
 def test_validar_produccion_acepta_configuracion_correcta(monkeypatch):
-    import app as sifat
-    monkeypatch.setenv("SECRET_KEY", "x" * 64)
-    monkeypatch.setenv("FLASK_DEBUG", "false")
-    for nombre in ("API_BASE_URL", "API_KEY", "BACKEND_URL", "BACKEND_API_KEY"):
-        monkeypatch.setenv(nombre, "valor")
-    monkeypatch.setattr(sifat, "USE_MOCK", False)
-    monkeypatch.setitem(sifat.app.config, "SESSION_COOKIE_SECURE", True)
-    assert sifat.validar_produccion() == []
+    monkeypatch.setattr(config, "SECRET_KEY", "x" * 64)
+    monkeypatch.setattr(config, "FLASK_DEBUG", False)
+    monkeypatch.setattr(config, "SESSION_COOKIE_SECURE", True)
+    assert config.validar_produccion() == []
 
 
 def test_hsts_solo_con_https(modo_real, monkeypatch):

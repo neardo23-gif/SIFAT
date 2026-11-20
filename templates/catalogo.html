@@ -20,7 +20,7 @@
   <span class="mt-0.5 text-sello">{{ icon('alerta') }}</span>
   <div>
     <p class="font-semibold">No pudimos cargar el catálogo</p>
-    <p class="text-mute">{{ error }} Revisa que <span class="font-mono text-[13px]">API_BASE_URL</span> sea correcta y que la etapa <span class="font-mono text-[13px]">dev</span> esté implementada, o cambia a <span class="font-mono text-[13px]">USE_MOCK=true</span>.</p>
+    <p class="text-mute">{{ error }} Revisa que <span class="font-mono text-[13px]">API_BASE_URL</span> sea correcta y que la etapa <span class="font-mono text-[13px]">dev</span> esté implementada.</p>
   </div>
 </div>
 {% endif %}
@@ -218,3 +218,5 @@
   </form>
 </dialog>
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/catalogo.js') }}" defer></script>{% endblock %}

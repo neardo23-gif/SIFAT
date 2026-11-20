@@ -1,9 +1,7 @@
 """Inicio de sesión, cierre de sesión, pantallas protegidas y permisos por rol."""
 import pytest
 
-from conftest import ADMIN, CSRF, RespuestaFalsa, con_csrf, html
-
-FACTURISTA = {**ADMIN, "id_usuario": 2, "nombre": "Luis Perez", "rol": "Facturista"}
+from conftest import ADMIN, CSRF, FACTURISTA, RespuestaFalsa, con_csrf, html
 
 
 @pytest.mark.parametrize("ruta", ["/catalogo", "/facturas", "/clientes", "/pagos"])
@@ -81,8 +79,9 @@ def test_facturista_no_ve_botones_de_edicion(sin_sesion, red):
     assert 'data-action="nuevo"' not in pagina and 'data-action="editar"' not in pagina
 
 
-def test_cabeceras_de_seguridad(modo_mock):
-    r = modo_mock.get("/catalogo")
+def test_cabeceras_de_seguridad(modo_real, red):
+    red.responder(RespuestaFalsa(200, {"servicios": []}))
+    r = modo_real.get("/catalogo")
     assert r.headers["X-Frame-Options"] == "DENY"
     assert r.headers["X-Content-Type-Options"] == "nosniff"
     assert r.headers["Cache-Control"] == "no-store"

@@ -18,7 +18,8 @@ cp .env.example .env          # y llena API_KEY, BACKEND_API_KEY y SECRET_KEY
 python app.py                 # http://127.0.0.1:5000  (el backend debe estar encendido)
 pytest                        # pruebas sin red
 ```
-Con `USE_MOCK=true` las pantallas muestran datos de ejemplo, pero no hay login ni escrituras.
+Las pruebas no necesitan red: simulan API Gateway y el backend. Para probar contra los servicios
+reales (solo lectura): `SIFAT_PRUEBAS_REALES=1 pytest tests/test_integracion_real.py`.
 
 ## Qué puede hacer cada rol
 | Acción | Administrador | Facturista |
@@ -31,7 +32,7 @@ Con `USE_MOCK=true` las pantallas muestran datos de ejemplo, pero no hay login n
 | Cancelar facturas (vigentes y sin pagos) | ✓ | |
 | Registrar pagos | ✓ | ✓ |
 
-Los permisos se validan en el servidor (`PERMISOS` en `app.py`); ocultar botones es solo comodidad.
+Los permisos se validan en el servidor (`PERMISOS` en `seguridad.py`); ocultar botones es solo comodidad.
 Quién emite una factura lo decide la sesión, y precios e impuestos los pone el backend desde el catálogo.
 
 ## Rutas del proxy
@@ -54,7 +55,7 @@ Front y backend corren en el **mismo servidor**: el backend solo escucha en `127
 1. **Código** en `/opt/sifat/front` y `/opt/sifat/backend`, con un usuario de sistema `sifat`.
 2. **Entorno** de cada uno: `python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
 3. **`.env` del front** (permisos `600`):
-   `APP_ENV=production`, `USE_MOCK=false`, `SESSION_COOKIE_SECURE=true`, `TRUST_PROXY=true`,
+   `APP_ENV=production`, `SESSION_COOKIE_SECURE=true`, `TRUST_PROXY=true`,
    `FLASK_DEBUG=false`, `PORT=5001`, un `SECRET_KEY` nuevo y las claves. Si falta algo, la app
    no arranca y dice qué falta.
 4. **`.env` del backend:** `ENABLE_DOCS=false`.
@@ -67,13 +68,25 @@ gunicorn corre con 1 proceso y varios hilos (`gunicorn.conf.py`), porque el lím
 de login por IP vive en memoria.
 
 ## Tailwind
-El CSS ya está compilado en `static/css/tailwind.css`. Si cambias clases en las plantillas o en `app.js`:
+El CSS ya está compilado en `static/css/tailwind.css`. Si cambias clases en las plantillas o en `static/js/`:
 ```bash
 npm ci
 npm run build:css      # o: npm run watch:css
 ```
 
 ## Estructura
-- `app.py` rutas, permisos y proxy · `mock_data.py` datos de ejemplo · `gunicorn.conf.py` producción
-- `templates/` landing, catálogo, facturas, clientes, pagos · `deploy/` systemd y nginx
-- `static/css/app.css` tokens, movimiento, modales · `static/js/app.js` filtros, modales y formularios
+```
+app.py              arma la app: configuración, seguridad y Blueprints
+config.py           variables de entorno y validar_produccion()
+seguridad.py        sesión, PERMISOS por rol, CSRF, límite de intentos, cabeceras
+backend.py          llamadas al backend (MySQL) y a API Gateway (catálogo)
+rutas/              un Blueprint por pantalla, con su página y sus rutas /api/
+  auth.py           portada, login, logout, /salud
+  catalogo.py · clientes.py · facturas.py · pagos.py
+  comun.py          utilidades compartidas (fechas, moneda, JSON)
+templates/          una plantilla por pantalla + base, app_base y _avisos
+static/js/comun.js  utilidades del navegador (window.SIFAT); se carga en todas las páginas
+static/js/<pantalla>.js   lo propio de cada pantalla; solo se carga en la suya
+static/css/         app.css (tokens, modales) y tailwind.css (compilado)
+gunicorn.conf.py · deploy/   producción (gunicorn, systemd, nginx)
+```

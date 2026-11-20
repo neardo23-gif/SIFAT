@@ -1,86 +1,15 @@
 """Pruebas de integración del front SIFAT.
 
 Cubren el recorrido completo petición -> ruta Flask -> cliente HTTP ->
-transformación de datos -> plantilla Jinja, en los dos modos de la app:
-
-* USE_MOCK=true: datos en memoria (CRUD del catálogo de punta a punta).
-* USE_MOCK=false: contra API Gateway y el backend MySQL (red simulada).
+transformación de datos -> plantilla Jinja, contra API Gateway y el backend
+MySQL con la red simulada.
 """
 import pytest
 import requests
 
+import backend
+import config
 from conftest import RespuestaFalsa, html
-
-
-# ---------------------------------------------------------------------------
-# Modo mock: navegación y CRUD del catálogo sin red
-# ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize("ruta, texto", [
-    ("/", "SIFAT"),
-    ("/catalogo", "Hosting Basico"),
-    ("/facturas", "FAC-0001"),
-    ("/clientes", "Consultoria Sur SA de CV"),
-    ("/pagos", "03 Transferencia electronica"),
-])
-def test_mock_todas_las_pantallas_cargan(modo_mock, ruta, texto):
-    r = modo_mock.get(ruta)
-    assert r.status_code == 200
-    assert texto in html(r)
-
-
-@pytest.mark.parametrize("ruta", ["/catalogo", "/facturas", "/clientes", "/pagos"])
-def test_mock_indica_origen_datos_de_ejemplo(modo_mock, ruta):
-    assert "Datos de ejemplo" in html(modo_mock.get(ruta))
-
-
-def test_mock_crud_completo_del_catalogo(modo_mock):
-    nuevo = {"id_servicio": "SRV-900", "clave": "INT-TST", "nombre": "Servicio de Integracion",
-             "categoria": "Pruebas", "precio_unitario": 123.45, "unidad_medida": "Servicio",
-             "activo": True, "impuesto_clave": "IVA|0.1600|traslado"}
-
-    # Alta: aparece en el catálogo renderizado
-    r = modo_mock.post("/api/servicios", json=nuevo)
-    assert r.status_code == 200
-    assert r.get_json()["servicio"]["id_servicio"] == "SRV-900"
-    pagina = html(modo_mock.get("/catalogo"))
-    assert "Servicio de Integracion" in pagina
-    assert "Pruebas" in pagina  # la categoría nueva entra al filtro
-
-    # Duplicado rechazado
-    assert modo_mock.post("/api/servicios", json=nuevo).status_code == 409
-
-    # Modificación: se refleja en la pantalla
-    r = modo_mock.put("/api/servicios", json={"id_servicio": "SRV-900",
-                                               "nombre": "Servicio Integrado"})
-    assert r.status_code == 200
-    assert r.get_json()["servicio"]["precio_unitario"] == 123.45  # conserva lo demás
-    assert "Servicio Integrado" in html(modo_mock.get("/catalogo"))
-
-    # Baja lógica: sigue listado pero inactivo, y no se puede dar de baja dos veces
-    r = modo_mock.delete("/api/servicios?id_servicio=SRV-900")
-    assert r.status_code == 200
-    servicio = r.get_json()["servicio"]
-    assert servicio["activo"] is False and servicio["fecha_baja"]
-    assert "Servicio Integrado" in html(modo_mock.get("/catalogo"))
-    assert modo_mock.delete("/api/servicios?id_servicio=SRV-900").status_code == 404
-
-
-@pytest.mark.parametrize("metodo, kwargs, codigo", [
-    ("post", {"json": {}}, 400),
-    ("post", {"json": {"nombre": "sin id"}}, 400),
-    ("put", {"json": {"id_servicio": "SRV-NOEXISTE", "nombre": "x"}}, 404),
-    ("delete", {}, 400),
-    ("delete", {"query_string": {"id_servicio": "SRV-NOEXISTE"}}, 404),
-])
-def test_mock_validaciones_del_api(modo_mock, metodo, kwargs, codigo):
-    r = getattr(modo_mock, metodo)("/api/servicios", **kwargs)
-    assert r.status_code == codigo
-    assert r.get_json()["mensaje"]
-
-
-def test_mock_metodo_get_no_permitido_en_api(modo_mock):
-    assert modo_mock.get("/api/servicios").status_code == 405
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +43,7 @@ def test_gateway_catalogo_recorre_todas_las_paginas(modo_real, red):
 
 
 def test_gateway_catalogo_respeta_tope_de_paginas(modo_real, red, monkeypatch):
-    import app as sifat
-    monkeypatch.setattr(sifat, "MAX_PAGINAS", 3)
+    monkeypatch.setattr(backend, "MAX_PAGINAS", 3)
     red.responder(*[RespuestaFalsa(200, {"servicios": [_servicio(i, f"S{i}")],
                                          "siguiente": f"t{i}"}) for i in range(3)])
     assert modo_real.get("/catalogo").status_code == 200
@@ -138,8 +66,7 @@ def test_gateway_catalogo_muestra_errores_sin_romperse(modo_real, red, respuesta
 
 
 def test_gateway_catalogo_sin_api_key_no_llama_a_la_red(modo_real, red, monkeypatch):
-    import app as sifat
-    monkeypatch.setattr(sifat, "API_KEY", "")
+    monkeypatch.setattr(config, "API_KEY", "")
     assert "Falta configurar API_KEY" in html(modo_real.get("/catalogo"))
     assert red.llamadas == []
 
@@ -187,7 +114,7 @@ def test_proxy_traduce_errores_del_gateway(modo_real, red, codigo):
     red.responder(RespuestaFalsa(codigo, {"message": "gateway"}))
     r = modo_real.put("/api/servicios", json={"id_servicio": "SRV-001"})
     assert r.status_code == codigo
-    assert r.get_json()["mensaje"] == __import__("app").ERRORES_GATEWAY[codigo]
+    assert r.get_json()["mensaje"] == backend.ERRORES_GATEWAY[codigo]
 
 
 def test_proxy_sin_conexion_responde_502(modo_real, red):
@@ -204,8 +131,7 @@ def test_proxy_rechaza_cuerpo_no_json_sin_llamar_a_la_red(modo_real, red):
 
 
 def test_proxy_sin_api_key_responde_500(modo_real, red, monkeypatch):
-    import app as sifat
-    monkeypatch.setattr(sifat, "API_KEY", "")
+    monkeypatch.setattr(config, "API_KEY", "")
     r = modo_real.post("/api/servicios", json={"id_servicio": "SRV-001", "impuesto_clave": "IVA|0.1600|traslado"})
     assert r.status_code == 500
     assert red.llamadas == []
@@ -281,8 +207,7 @@ def test_backend_errores_se_muestran_en_pantalla(modo_real, red, ruta, respuesta
 
 @pytest.mark.parametrize("ruta", ["/facturas", "/clientes", "/pagos"])
 def test_backend_sin_clave_no_llama_a_la_red(modo_real, red, monkeypatch, ruta):
-    import app as sifat
-    monkeypatch.setattr(sifat, "BACKEND_API_KEY", "")
+    monkeypatch.setattr(config, "BACKEND_API_KEY", "")
     assert "Falta configurar BACKEND_URL o BACKEND_API_KEY" in html(modo_real.get(ruta))
     assert red.llamadas == []
 

@@ -3,7 +3,7 @@
 {% block title %}Facturas · SIFAT{% endblock %}
 
 {% block main %}
-{% set puede_emitir = not usa_mock and not aviso and puede('emitir_factura') %}
+{% set puede_emitir = not aviso and puede('emitir_factura') %}
 <div class="flex flex-wrap items-end justify-between gap-4">
   <div>
     <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Facturas</h1>
@@ -26,7 +26,7 @@
   {% if facturas %}
   <div class="overflow-x-auto">
     <table class="w-full min-w-[680px] text-left text-[15px]" id="tabla-facturas">
-      <caption class="sr-only">Facturas emitidas{% if not usa_mock %}. Selecciona un folio para ver el detalle.{% endif %}</caption>
+      <caption class="sr-only">Facturas emitidas. Selecciona un folio para ver el detalle.</caption>
       <thead>
         <tr class="border-b border-line text-[13px] text-mute">
           <th scope="col" class="px-4 py-3 font-medium">Folio</th>
@@ -39,9 +39,9 @@
       </thead>
       <tbody>
         {% for f in facturas %}
-        <tr class="row" {% if not usa_mock %}data-folio="{{ f.folio }}"{% endif %}>
+        <tr class="row" data-folio="{{ f.folio }}">
           <td class="px-4 py-3.5 font-mono text-[13px]">
-            {% if not usa_mock %}<button type="button" class="row-open font-mono" data-action="ver-factura" data-folio="{{ f.folio }}">{{ f.folio }}</button>{% else %}{{ f.folio }}{% endif %}
+            <button type="button" class="row-open font-mono" data-action="ver-factura" data-folio="{{ f.folio }}">{{ f.folio }}</button>
           </td>
           <td class="px-4 py-3.5 font-medium">{{ f.cliente }}</td>
           <td class="whitespace-nowrap px-4 py-3.5 text-mute">{{ f.fecha }}</td>
@@ -66,11 +66,10 @@
   {% endif %}
 </section>
 
-{% if not usa_mock %}
 <script type="application/json" id="facturas-config">{{ {
   'puede_cancelar': puede('cancelar_factura'),
   'puede_pagar': puede('registrar_pago'),
-  'url_pagos': url_for('pagos'),
+  'url_pagos': url_for('pagos.pantalla'),
   'servicios': servicios_activos,
 }|tojson }}</script>
 
@@ -136,7 +135,6 @@
     </div>
   </form>
 </dialog>
-{% endif %}
 
 {% if puede_emitir and clientes_activos and servicios_activos %}
 {# ---------- Nueva factura ---------- #}
@@ -191,3 +189,5 @@
 </dialog>
 {% endif %}
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/facturas.js') }}" defer></script>{% endblock %}

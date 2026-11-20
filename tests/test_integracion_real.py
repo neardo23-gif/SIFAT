@@ -10,8 +10,11 @@ Solo hacen GET: no crean, modifican ni dan de baja nada en AWS ni en MySQL.
 import os
 
 import pytest
+from dotenv import dotenv_values
 
 import app as sifat
+import backend
+import config
 from conftest import con_csrf, html
 
 pytestmark = pytest.mark.skipif(
@@ -19,18 +22,26 @@ pytestmark = pytest.mark.skipif(
     reason="Define SIFAT_PRUEBAS_REALES=1 para probar contra API Gateway y el backend reales.",
 )
 
+RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+@pytest.fixture(autouse=True)
+def servicios_reales(monkeypatch):
+    """Deshace las URLs de prueba de conftest: aquí se usa el .env de verdad."""
+    env = dotenv_values(os.path.join(RAIZ, ".env"))
+    for nombre in ("API_BASE_URL", "API_KEY", "BACKEND_URL", "BACKEND_API_KEY"):
+        monkeypatch.setattr(config, nombre, (env.get(nombre) or "").strip().rstrip("/"))
+
 
 @pytest.fixture
-def cliente_real(monkeypatch):
-    monkeypatch.setattr(sifat, "USE_MOCK", False)
-    sifat.app.config.update(TESTING=True)
+def cliente_real():
     return con_csrf(sifat.app.test_client())
 
 
 def test_api_gateway_lista_servicios():
-    if not sifat.API_KEY:
+    if not config.API_KEY:
         pytest.skip("Falta API_KEY en .env")
-    servicios, error = _sin_mock(sifat.listar_servicios)
+    servicios, error = backend.listar_servicios()
     assert error is None, error
     assert isinstance(servicios, list)
     for s in servicios:
@@ -38,7 +49,7 @@ def test_api_gateway_lista_servicios():
 
 
 def test_catalogo_real_sin_error(cliente_real):
-    if not sifat.API_KEY:
+    if not config.API_KEY:
         pytest.skip("Falta API_KEY en .env")
     r = cliente_real.get("/catalogo")
     assert r.status_code == 200
@@ -53,9 +64,9 @@ def test_catalogo_real_sin_error(cliente_real):
 ])
 def test_backend_cumple_el_contrato(ruta, llave, campos):
     """El front depende de estos campos: si el backend los renombra, falla aquí."""
-    if not sifat.BACKEND_API_KEY:
+    if not config.BACKEND_API_KEY:
         pytest.skip("Falta BACKEND_API_KEY en .env")
-    datos, error = sifat.consultar_backend(ruta, llave)
+    datos, error = backend.consultar_backend(ruta, llave)
     assert error is None, error
     for fila in datos:
         faltan = campos - fila.keys()
@@ -64,17 +75,9 @@ def test_backend_cumple_el_contrato(ruta, llave, campos):
 
 @pytest.mark.parametrize("ruta", ["/facturas", "/clientes", "/pagos"])
 def test_pantallas_backend_reales_sin_error(cliente_real, ruta):
-    if not sifat.BACKEND_API_KEY:
+    if not config.BACKEND_API_KEY:
         pytest.skip("Falta BACKEND_API_KEY en .env")
     r = cliente_real.get(ruta)
     assert r.status_code == 200
     assert "No se pudo contactar al backend" not in html(r)
     assert "Backend (MySQL)" in html(r)
-
-
-def _sin_mock(funcion):
-    anterior, sifat.USE_MOCK = sifat.USE_MOCK, False
-    try:
-        return funcion()
-    finally:
-        sifat.USE_MOCK = anterior

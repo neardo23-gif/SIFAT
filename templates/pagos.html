@@ -3,7 +3,7 @@
 {% block title %}Pagos · SIFAT{% endblock %}
 
 {% block main %}
-{% set puede_pagar = not usa_mock and not aviso and puede('registrar_pago') %}
+{% set puede_pagar = not aviso and puede('registrar_pago') %}
 <div class="flex flex-wrap items-end justify-between gap-4">
   <div>
     <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Pagos</h1>
@@ -102,3 +102,5 @@
 </dialog>
 {% endif %}
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/pagos.js') }}" defer></script>{% endblock %}

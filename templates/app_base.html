@@ -2,10 +2,10 @@
 {% from "_icons.html" import icon %}
 
 {% set nav = [
-  ('catalogo', 'Catálogo', url_for('catalogo')),
-  ('facturas', 'Facturas', url_for('facturas')),
-  ('clientes', 'Clientes', url_for('clientes')),
-  ('pagos', 'Pagos', url_for('pagos'))
+  ('catalogo', 'Catálogo', url_for('catalogo.pantalla')),
+  ('facturas', 'Facturas', url_for('facturas.pantalla')),
+  ('clientes', 'Clientes', url_for('clientes.pantalla')),
+  ('pagos', 'Pagos', url_for('pagos.pantalla'))
 ] %}
 
 {% block body %}
@@ -13,7 +13,7 @@
 
   <aside class="hidden border-r border-line bg-ink lg:flex lg:h-screen lg:flex-col lg:sticky lg:top-0" aria-label="Navegación principal">
     <div class="px-5 pb-4 pt-5">
-      <a href="{{ url_for('landing') }}" class="logo inline-flex items-center gap-2.5 rounded-md text-[17px] font-bold tracking-tight">
+      <a href="{{ url_for('auth.portada') }}" class="logo inline-flex items-center gap-2.5 rounded-md text-[17px] font-bold tracking-tight">
         <span class="logo-mark" aria-hidden="true"></span>SIFAT
       </a>
     </div>
@@ -33,13 +33,13 @@
       {% if usuario_actual() %}
       <p class="font-semibold text-[#f2f2f2]">{{ usuario_actual().nombre }}</p>
       <p class="text-mute">{{ usuario_actual().rol }}</p>
-      <form action="{{ url_for('logout') }}" method="post" class="mb-3 mt-2">
+      <form action="{{ url_for('auth.logout') }}" method="post" class="mb-3 mt-2">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-ghost btn-sm w-full justify-center">Cerrar sesión</button>
       </form>
       {% endif %}
       <p class="flex items-center gap-2 text-mute">
-        <span class="h-1.5 w-1.5 rounded-full {{ 'bg-sello' if usa_mock else 'bg-soft' }}" aria-hidden="true"></span>
+        <span class="h-1.5 w-1.5 rounded-full bg-soft" aria-hidden="true"></span>
         Origen: <span class="text-[#f2f2f2]">{{ origen }}</span>
       </p>
     </div>
@@ -48,10 +48,10 @@
   <div class="min-w-0">
     <header class="sticky top-0 z-30 border-b border-line bg-ink/90 backdrop-blur lg:hidden">
       <div class="flex items-center justify-between px-4 py-3">
-        <a href="{{ url_for('landing') }}" class="logo inline-flex items-center gap-2.5 text-[17px] font-bold tracking-tight">
+        <a href="{{ url_for('auth.portada') }}" class="logo inline-flex items-center gap-2.5 text-[17px] font-bold tracking-tight">
           <span class="logo-mark" aria-hidden="true"></span>SIFAT
         </a>
-        <form action="{{ url_for('logout') }}" method="post">
+        <form action="{{ url_for('auth.logout') }}" method="post">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-ghost btn-sm">Salir</button>
         </form>
