@@ -1,27 +1,79 @@
 # SIFAT · Front
 
 Flask + Jinja + Tailwind (compilado) para el catálogo de servicios, facturas, clientes y pagos.
+El navegador nunca habla con AWS ni con el backend: `app.py` hace de proxy y guarda las claves.
 
-## Arranque
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env          # USE_MOCK=true por defecto
-python app.py                 # http://127.0.0.1:5000
+```
+Navegador ──HTTPS──► nginx ──► gunicorn (este repo, 127.0.0.1:5001)
+                                   ├──X-API-Key──► Backend SIFAT-BACKEND (127.0.0.1:8000) ──► MySQL (RDS)
+                                   └──x-api-key──► API Gateway ──► Lambda ──► DynamoDB (servicios)
 ```
 
-## Conectar con API Gateway
-En `.env`: `USE_MOCK=false` y `API_BASE_URL=https://<id>.execute-api.us-east-1.amazonaws.com/dev`.
-El navegador nunca llama a AWS: `app.py` hace de proxy en `/api/servicios` (POST, PUT, DELETE) y renderiza el GET.
+## Arranque local
+Requiere **Python 3.10 o más reciente** (en Mac: `brew install python@3.13`).
+```bash
+/opt/homebrew/bin/python3.13 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env          # y llena API_KEY, BACKEND_API_KEY y SECRET_KEY
+python app.py                 # http://127.0.0.1:5000  (el backend debe estar encendido)
+pytest                        # pruebas sin red
+```
+Con `USE_MOCK=true` las pantallas muestran datos de ejemplo, pero no hay login ni escrituras.
+
+## Qué puede hacer cada rol
+| Acción | Administrador | Facturista |
+|---|:-:|:-:|
+| Ver todo | ✓ | ✓ |
+| Alta y edición del catálogo de servicios | ✓ | |
+| Alta y edición de clientes | ✓ | ✓ |
+| Activar / desactivar clientes | ✓ | |
+| Emitir facturas | ✓ | ✓ |
+| Cancelar facturas (vigentes y sin pagos) | ✓ | |
+| Registrar pagos | ✓ | ✓ |
+
+Los permisos se validan en el servidor (`PERMISOS` en `app.py`); ocultar botones es solo comodidad.
+Quién emite una factura lo decide la sesión, y precios e impuestos los pone el backend desde el catálogo.
+
+## Rutas del proxy
+| Método | Ruta | Va a |
+|---|---|---|
+| POST, PUT, DELETE | `/api/servicios` | API Gateway `/servicios` |
+| POST | `/api/clientes` | Backend `POST /clientes` |
+| PATCH | `/api/clientes/<id>` | Backend `PATCH /clientes/<id>` |
+| POST | `/api/facturas` | Backend `POST /facturas` |
+| GET | `/api/facturas/<folio>` | Backend `GET /facturas/<folio>` |
+| POST | `/api/facturas/<folio>/cancelar` | Backend `POST /facturas/<folio>/cancelar` |
+| POST | `/api/pagos` | Backend `POST /pagos` |
+| GET | `/salud` | Comprobación de vida (pública) |
+
+Todas las rutas `/api/` piden sesión, y las que escriben piden además el token CSRF (cabecera `X-CSRF-Token`).
+
+## Producción
+Front y backend corren en el **mismo servidor**: el backend solo escucha en `127.0.0.1`.
+
+1. **Código** en `/opt/sifat/front` y `/opt/sifat/backend`, con un usuario de sistema `sifat`.
+2. **Entorno** de cada uno: `python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
+3. **`.env` del front** (permisos `600`):
+   `APP_ENV=production`, `USE_MOCK=false`, `SESSION_COOKIE_SECURE=true`, `TRUST_PROXY=true`,
+   `FLASK_DEBUG=false`, `PORT=5001`, un `SECRET_KEY` nuevo y las claves. Si falta algo, la app
+   no arranca y dice qué falta.
+4. **`.env` del backend:** `ENABLE_DOCS=false`.
+5. **Servicios:** copia `deploy/sifat-front.service` (y `deploy/sifat-backend.service` del otro repo)
+   a `/etc/systemd/system/` y actívalos con `systemctl enable --now`.
+6. **nginx + HTTPS:** usa `deploy/nginx-sifat.conf` con tu dominio y genera el certificado con certbot.
+7. **Comprueba:** `curl https://tu-dominio/salud` → `{"estado":"ok"}`.
+
+gunicorn corre con 1 proceso y varios hilos (`gunicorn.conf.py`), porque el límite de intentos
+de login por IP vive en memoria.
 
 ## Tailwind
-El CSS ya está compilado en `static/css/tailwind.css`. Si cambias clases en las plantillas:
+El CSS ya está compilado en `static/css/tailwind.css`. Si cambias clases en las plantillas o en `app.js`:
 ```bash
-npm install
+npm ci
 npm run build:css      # o: npm run watch:css
 ```
 
 ## Estructura
-- `app.py` rutas y proxy · `mock_data.py` datos de ejemplo
-- `templates/` landing, catálogo, facturas, clientes, pagos
-- `static/css/app.css` tokens, movimiento, modales · `static/js/app.js` filtros, modales, CRUD
+- `app.py` rutas, permisos y proxy · `mock_data.py` datos de ejemplo · `gunicorn.conf.py` producción
+- `templates/` landing, catálogo, facturas, clientes, pagos · `deploy/` systemd y nginx
+- `static/css/app.css` tokens, movimiento, modales · `static/js/app.js` filtros, modales y formularios
