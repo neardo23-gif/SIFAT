@@ -7,6 +7,7 @@ import copy
 import hmac
 import logging
 import os
+import re
 import secrets
 import time
 from collections import defaultdict, deque
@@ -16,6 +17,7 @@ import requests
 from dotenv import load_dotenv
 from flask import (Flask, Response, jsonify, redirect, render_template, request, session,
                    url_for)
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from mock_data import CLIENTES, FACTURAS, IVA, PAGOS, SERVICIOS
 
@@ -24,6 +26,16 @@ MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "
 load_dotenv()
 
 log = logging.getLogger("sifat-front")
+
+
+def _bandera(nombre, defecto="false"):
+    return os.getenv(nombre, defecto).strip().lower() == "true"
+
+
+# development (por defecto) o production. En producción la app se niega a
+# arrancar con una configuración insegura (ver validar_produccion).
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+PRODUCCION = APP_ENV == "production"
 
 app = Flask(__name__)
 # Firma la cookie de sesión (token CSRF). Debe venir del .env para que no cambie al reiniciar.
@@ -34,9 +46,14 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Strict",
     # true cuando el sitio se sirva por HTTPS (en producción)
-    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true",
+    SESSION_COOKIE_SECURE=_bandera("SESSION_COOKIE_SECURE"),
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
 )
+
+# Detrás de nginx: la IP real del visitante llega en X-Forwarded-For. Solo se
+# confía en esa cabecera si se indica, porque sin proxy cualquiera podría falsificarla.
+if _bandera("TRUST_PROXY"):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 # Sin valores por defecto: cada entorno define sus URLs en .env
 API_BASE_URL = os.getenv("API_BASE_URL", "").strip().rstrip("/")
@@ -65,6 +82,29 @@ ERRORES_GATEWAY = {
 }
 
 _mock_store = {s["id_servicio"]: copy.deepcopy(s) for s in SERVICIOS}
+
+
+def validar_produccion():
+    """Lista de problemas de configuración que impiden servir en producción."""
+    problemas = []
+    if len(os.getenv("SECRET_KEY", "").strip()) < 32:
+        problemas.append("SECRET_KEY debe existir y tener al menos 32 caracteres")
+    if USE_MOCK:
+        problemas.append("USE_MOCK debe ser false")
+    if not app.config["SESSION_COOKIE_SECURE"]:
+        problemas.append("SESSION_COOKIE_SECURE debe ser true (el sitio se sirve por HTTPS)")
+    if _bandera("FLASK_DEBUG"):
+        problemas.append("FLASK_DEBUG debe ser false")
+    for nombre in ("API_BASE_URL", "API_KEY", "BACKEND_URL", "BACKEND_API_KEY"):
+        if not os.getenv(nombre, "").strip():
+            problemas.append(f"Falta {nombre}")
+    return problemas
+
+
+if PRODUCCION:
+    _problemas = validar_produccion()
+    if _problemas:
+        raise RuntimeError("Configuración insegura para producción: " + "; ".join(_problemas))
 
 
 @app.template_filter("mxn")
@@ -130,12 +170,15 @@ def _fecha(valor):
         return "-"
 
 
-def consultar_backend(ruta, llave):
-    """Devuelve (lista, error). Nunca lanza: la pantalla muestra el error."""
+def consultar_backend(ruta, llave, **filtros):
+    """Devuelve (lista, error). Nunca lanza: la pantalla muestra el error.
+
+    llave=None devuelve el JSON completo (por ejemplo, todos los catálogos).
+    """
     if not BACKEND_API_KEY or not BACKEND_URL:
         return [], "Falta configurar BACKEND_URL o BACKEND_API_KEY en el archivo .env."
     try:
-        r = requests.get(f"{BACKEND_URL}{ruta}", params={"limite": 200},
+        r = requests.get(f"{BACKEND_URL}{ruta}", params={"limite": 200, **filtros},
                          headers={"X-API-Key": BACKEND_API_KEY}, timeout=TIMEOUT)
     except requests.RequestException as exc:
         return [], f"No se pudo contactar al backend en {BACKEND_URL} ({exc.__class__.__name__}). ¿Está encendido?"
@@ -144,21 +187,51 @@ def consultar_backend(ruta, llave):
     if r.status_code != 200:
         return [], f"El backend respondió {r.status_code}."
     try:
-        return r.json().get(llave, []), None
+        datos = r.json()
+        return (datos if llave is None else datos.get(llave, [])), None
     except ValueError:
         return [], "El backend devolvió una respuesta inválida."
 
 
+def catalogos_sat():
+    """Devuelve (catálogos, error): regímenes, usos de CFDI, formas y métodos de pago."""
+    vacio = {"regimenes": [], "usos-cfdi": [], "formas-pago": [], "metodos-pago": []}
+    if USE_MOCK:
+        return vacio, None
+    datos, error = consultar_backend("/catalogos", None)
+    if error or not isinstance(datos, dict):
+        return vacio, error or "El backend devolvió catálogos inválidos."
+    return {k: datos.get(k, []) for k in vacio}, None
+
+
 # ---------------- Sesión y permisos ----------------
-RUTAS_PUBLICAS = {"landing", "login", "static"}
+RUTAS_PUBLICAS = {"landing", "login", "static", "salud"}
 ROL_EDITA_CATALOGO = "Administrador"
+ADMIN, FACTURISTA = "Administrador", "Facturista"
+
+# Qué puede hacer cada rol. Lo que deshace o borra trabajo (cancelar facturas,
+# desactivar clientes) queda solo para el Administrador.
+PERMISOS = {
+    "crear_cliente": {ADMIN, FACTURISTA},
+    "editar_cliente": {ADMIN, FACTURISTA},
+    "desactivar_cliente": {ADMIN},
+    "emitir_factura": {ADMIN, FACTURISTA},
+    "cancelar_factura": {ADMIN},
+    "registrar_pago": {ADMIN, FACTURISTA},
+}
 
 
 def usuario_actual():
     return session.get("usuario")
 
 
+def puede(accion):
+    usuario = usuario_actual()
+    return bool(usuario) and usuario.get("rol") in PERMISOS.get(accion, set())
+
+
 app.jinja_env.globals["usuario_actual"] = usuario_actual
+app.jinja_env.globals["puede"] = puede
 
 
 @app.before_request
@@ -177,6 +250,9 @@ def cabeceras_seguras(respuesta):
     respuesta.headers["X-Content-Type-Options"] = "nosniff"
     respuesta.headers["X-Frame-Options"] = "DENY"
     respuesta.headers["Referrer-Policy"] = "same-origin"
+    if app.config["SESSION_COOKIE_SECURE"]:
+        # El navegador recordará usar solo HTTPS durante un año
+        respuesta.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if usuario_actual():
         respuesta.headers["Cache-Control"] = "no-store"
     return respuesta
@@ -335,37 +411,283 @@ def catalogo():
     )
 
 
+def _sin_formulario():
+    """Contexto de las pantallas cuando no se puede escribir (modo de ejemplo)."""
+    return {"catalogos": {"regimenes": [], "usos-cfdi": [], "formas-pago": [], "metodos-pago": []},
+            "aviso": None}
+
+
 @app.route("/facturas")
 def facturas():
     if USE_MOCK:
-        return render_template("facturas.html", facturas=FACTURAS, **contexto_base("facturas"))
+        return render_template("facturas.html", facturas=FACTURAS, clientes_activos=[],
+                               servicios_activos=[], **_sin_formulario(), **contexto_base("facturas"))
     datos, error = consultar_backend("/facturas", "facturas")
     filas = [{"folio": f["folio"], "cliente": f["cliente"], "fecha": _fecha(f["fecha_emision"]),
               "subtotal": f["subtotal"], "iva": f["iva"], "total": f["total"],
               "estatus": f["estatus"]} for f in datos]
-    return render_template("facturas.html", facturas=filas, error=error, **contexto_base("facturas"))
+
+    # Lo que necesita el formulario de "Nueva factura": clientes activos,
+    # servicios activos del catálogo y las claves del SAT.
+    clientes_activos, servicios_activos, aviso = [], [], None
+    catalogos, error_cat = _sin_formulario()["catalogos"], None
+    # Si ni la lista cargó, el backend no responde: no tiene caso pedir más datos
+    if puede("emitir_factura") and not error:
+        catalogos, error_cat = catalogos_sat()
+        crudos, error_cli = consultar_backend("/clientes", "clientes")
+        clientes_activos = [{"id_cliente": c["id_cliente"], "razon_social": c["razon_social"],
+                             "rfc": c["rfc"]} for c in crudos]
+        servicios, error_srv = listar_servicios()
+        servicios_activos = [{"id_servicio": s["id_servicio"], "clave": s.get("clave", ""),
+                              "nombre": s.get("nombre", ""),
+                              "precio_unitario": s.get("precio_unitario", 0),
+                              "unidad_medida": s.get("unidad_medida", ""),
+                              "tasa": (s.get("impuesto") or {}).get("tasa", 0)}
+                             for s in servicios if s.get("activo")]
+        problema = error_cat or error_cli or error_srv
+        if problema:
+            aviso = f"No se podrán emitir facturas por ahora: {problema}"
+    return render_template("facturas.html", facturas=filas, error=error, aviso=aviso,
+                           catalogos=catalogos, clientes_activos=clientes_activos,
+                           servicios_activos=servicios_activos, **contexto_base("facturas"))
 
 
 @app.route("/clientes")
 def clientes():
     if USE_MOCK:
-        return render_template("clientes.html", clientes=CLIENTES, **contexto_base("clientes"))
-    datos, error = consultar_backend("/clientes", "clientes")
-    filas = [{"id": f"CLI-{c['id_cliente']:03d}", "razon_social": c["razon_social"], "rfc": c["rfc"],
-              "cp": c["cp_fiscal"], "email": c.get("email") or "-", "activo": c["activo"]}
+        return render_template("clientes.html", clientes=CLIENTES, **_sin_formulario(),
+                               **contexto_base("clientes"))
+    datos, error = consultar_backend("/clientes", "clientes", incluir_inactivos="true")
+    filas = [{"id": f"CLI-{c['id_cliente']:03d}", "id_cliente": c["id_cliente"],
+              "razon_social": c["razon_social"], "rfc": c["rfc"], "cp": c["cp_fiscal"],
+              "email": c.get("email") or "-", "email_crudo": c.get("email") or "",
+              "telefono": c.get("telefono") or "", "clave_regimen": c.get("clave_regimen", ""),
+              "regimen": c.get("regimen", ""), "clave_uso": c.get("clave_uso", ""),
+              "uso_cfdi": c.get("uso_cfdi", ""), "activo": c["activo"]}
              for c in datos]
-    return render_template("clientes.html", clientes=filas, error=error, **contexto_base("clientes"))
+    catalogos, aviso = _sin_formulario()["catalogos"], None
+    if (puede("crear_cliente") or puede("editar_cliente")) and not error:
+        catalogos, error_cat = catalogos_sat()
+        if error_cat:
+            aviso = f"No se podrán guardar clientes por ahora: {error_cat}"
+    return render_template("clientes.html", clientes=filas, error=error, aviso=aviso,
+                           catalogos=catalogos, **contexto_base("clientes"))
 
 
 @app.route("/pagos")
 def pagos():
     if USE_MOCK:
-        return render_template("pagos.html", pagos=PAGOS, **contexto_base("pagos"))
+        return render_template("pagos.html", pagos=PAGOS, facturas_vigentes=[], folio_inicial="",
+                               **_sin_formulario(), **contexto_base("pagos"))
     datos, error = consultar_backend("/pagos", "pagos")
     filas = [{"id": p["id_pago"], "folio": p["folio"], "fecha": _fecha(p["fecha_pago"]),
               "forma": f"{p['clave_forma_pago']} {p['forma_pago']}", "monto": p["monto"],
               "referencia": p.get("referencia") or "-"} for p in datos]
-    return render_template("pagos.html", pagos=filas, error=error, **contexto_base("pagos"))
+
+    vigentes, aviso = [], None
+    catalogos, error_cat = _sin_formulario()["catalogos"], None
+    if puede("registrar_pago") and not error:
+        catalogos, error_cat = catalogos_sat()
+        crudas, error_fac = consultar_backend("/facturas", "facturas", estatus="vigente")
+        vigentes = [{"folio": f["folio"], "cliente": f["cliente"], "total": f["total"]} for f in crudas]
+        problema = error_cat or error_fac
+        if problema:
+            aviso = f"No se podrán registrar pagos por ahora: {problema}"
+    # /pagos?folio=FAC-0001 abre el formulario con esa factura elegida
+    folio = request.args.get("folio", "")
+    folio_inicial = folio if FOLIO_RE.match(folio) else ""
+    return render_template("pagos.html", pagos=filas, error=error, aviso=aviso,
+                           catalogos=catalogos, facturas_vigentes=vigentes,
+                           folio_inicial=folio_inicial, **contexto_base("pagos"))
+
+
+@app.route("/salud")
+def salud():
+    """Comprobación de vida para el balanceador o el monitoreo (no consulta nada)."""
+    return jsonify({"estado": "ok"})
+
+
+# ---------------- Escrituras hacia el backend (clientes, facturas, pagos) ----------------
+FOLIO_RE = re.compile(r"^FAC-\d{4,10}$")
+CAMPOS_CLIENTE = {"rfc", "razon_social", "cp_fiscal", "clave_regimen", "clave_uso", "email", "telefono"}
+CAMPOS_CLIENTE_CAMBIO = (CAMPOS_CLIENTE - {"rfc"}) | {"activo"}
+OPCIONALES_CLIENTE = {"email", "telefono"}
+CAMPOS_PAGO = {"folio", "clave_forma_pago", "monto", "referencia"}
+
+# Nombres legibles para los errores de validación que devuelve el backend
+ETIQUETAS = {
+    "rfc": "RFC", "razon_social": "razón social", "cp_fiscal": "C.P. fiscal",
+    "clave_regimen": "régimen fiscal", "clave_uso": "uso de CFDI", "email": "correo",
+    "telefono": "teléfono", "activo": "estado", "id_cliente": "cliente",
+    "clave_forma_pago": "forma de pago", "clave_metodo_pago": "método de pago",
+    "conceptos": "conceptos", "id_servicio": "servicio", "cantidad": "cantidad",
+    "motivo": "motivo", "folio": "factura", "monto": "monto", "referencia": "referencia",
+}
+
+
+def _json_objeto():
+    crudo = request.get_json(silent=True)
+    return crudo if isinstance(crudo, dict) else None
+
+
+def _mensaje_validacion(datos):
+    """Convierte la lista de errores de Pydantic del backend en una frase en español."""
+    campos = []
+    for e in datos.get("errores", []):
+        partes = [p for p in str(e.get("campo", "")).split(".") if p and not p.isdigit()]
+        etiqueta = ETIQUETAS.get(partes[-1] if partes else "", "un campo")
+        if etiqueta not in campos:
+            campos.append(etiqueta)
+    return f"Revisa estos datos: {', '.join(campos)}" if campos else "Datos inválidos"
+
+
+def proxy_backend(metodo, ruta, cuerpo=None):
+    """Reenvía una petición al backend y devuelve su respuesta JSON al navegador."""
+    if USE_MOCK:
+        return jsonify({"mensaje": "Esta acción necesita el backend: pon USE_MOCK=false."}), 503
+    if not BACKEND_URL or not BACKEND_API_KEY:
+        return jsonify({"mensaje": "Falta configurar BACKEND_URL o BACKEND_API_KEY en el archivo .env."}), 500
+    try:
+        # Emitir una factura consulta cada servicio en DynamoDB: se da más tiempo
+        r = requests.request(metodo, f"{BACKEND_URL}{ruta}", json=cuerpo,
+                             headers={"X-API-Key": BACKEND_API_KEY}, timeout=TIMEOUT * 2)
+    except requests.RequestException as exc:
+        log.warning("Backend no disponible: %s", exc.__class__.__name__)
+        return jsonify({"mensaje": "No se pudo contactar al servidor. Intenta más tarde."}), 502
+    if r.status_code == 401:
+        # Es un problema de configuración del servidor, no de la sesión del usuario
+        log.error("El backend rechazó BACKEND_API_KEY")
+        return jsonify({"mensaje": "El servidor no está bien configurado. Avisa al administrador."}), 502
+    try:
+        datos = r.json()
+    except ValueError:
+        return jsonify({"mensaje": "El servidor devolvió una respuesta inválida."}), 502
+    if r.status_code == 400 and isinstance(datos, dict) and "errores" in datos:
+        return jsonify({"mensaje": _mensaje_validacion(datos)}), 400
+    if r.status_code >= 500:
+        detalle = f" (código {datos['error_id']})" if isinstance(datos, dict) and datos.get("error_id") else ""
+        return jsonify({"mensaje": f"Ocurrió un error en el servidor{detalle}. Intenta de nuevo."}), 502
+    return jsonify(datos), r.status_code
+
+
+def _rechazo(accion, texto):
+    """Valida CSRF y permiso. Devuelve una respuesta de error o None si todo bien."""
+    if not csrf_valido():
+        return jsonify({"mensaje": "Sesión inválida o expirada. Recarga la página."}), 403
+    if not puede(accion):
+        return jsonify({"mensaje": texto}), 403
+    return None
+
+
+def _limpiar_cliente(cuerpo, permitidos):
+    datos = {k: v for k, v in cuerpo.items() if k in permitidos}
+    for k, v in list(datos.items()):
+        if isinstance(v, str):
+            datos[k] = v.strip()
+        if k in OPCIONALES_CLIENTE and datos[k] == "":
+            datos[k] = None  # vacío = sin dato
+    if "rfc" in datos and isinstance(datos["rfc"], str):
+        datos["rfc"] = datos["rfc"].upper()
+    if "email" in datos and isinstance(datos["email"], str):
+        datos["email"] = datos["email"].lower()
+    return datos
+
+
+@app.route("/api/clientes", methods=["POST"])
+def api_crear_cliente():
+    rechazo = _rechazo("crear_cliente", "Tu rol no puede dar de alta clientes.")
+    if rechazo:
+        return rechazo
+    cuerpo = _json_objeto()
+    if cuerpo is None:
+        return jsonify({"mensaje": "El cuerpo de la petición debe ser un objeto JSON"}), 400
+    datos = _limpiar_cliente(cuerpo, CAMPOS_CLIENTE)
+    # En un alta, un opcional vacío simplemente no se manda
+    datos = {k: v for k, v in datos.items() if v is not None}
+    return proxy_backend("POST", "/clientes", datos)
+
+
+@app.route("/api/clientes/<int:id_cliente>", methods=["PATCH"])
+def api_modificar_cliente(id_cliente):
+    rechazo = _rechazo("editar_cliente", "Tu rol no puede modificar clientes.")
+    if rechazo:
+        return rechazo
+    cuerpo = _json_objeto()
+    if cuerpo is None:
+        return jsonify({"mensaje": "El cuerpo de la petición debe ser un objeto JSON"}), 400
+    datos = _limpiar_cliente(cuerpo, CAMPOS_CLIENTE_CAMBIO)
+    if "activo" in datos:
+        if not isinstance(datos["activo"], bool):
+            return jsonify({"mensaje": "El estado del cliente no es válido"}), 400
+        if not puede("desactivar_cliente"):
+            return jsonify({"mensaje": "Solo un Administrador puede activar o desactivar clientes."}), 403
+    if not datos:
+        return jsonify({"mensaje": "No hay cambios que guardar"}), 400
+    return proxy_backend("PATCH", f"/clientes/{id_cliente}", datos)
+
+
+@app.route("/api/facturas", methods=["POST"])
+def api_emitir_factura():
+    rechazo = _rechazo("emitir_factura", "Tu rol no puede emitir facturas.")
+    if rechazo:
+        return rechazo
+    cuerpo = _json_objeto()
+    if cuerpo is None:
+        return jsonify({"mensaje": "El cuerpo de la petición debe ser un objeto JSON"}), 400
+    conceptos = cuerpo.get("conceptos")
+    if not isinstance(conceptos, list) or not conceptos:
+        return jsonify({"mensaje": "Agrega al menos un concepto"}), 400
+    if any(not isinstance(c, dict) for c in conceptos):
+        return jsonify({"mensaje": "Los conceptos no son válidos"}), 400
+    datos = {
+        "id_cliente": cuerpo.get("id_cliente"),
+        # Quién emite lo decide la sesión, nunca el navegador
+        "id_usuario": usuario_actual()["id_usuario"],
+        "clave_forma_pago": cuerpo.get("clave_forma_pago"),
+        "clave_metodo_pago": cuerpo.get("clave_metodo_pago"),
+        # Solo servicio y cantidad: precio e impuesto los pone el backend desde el catálogo
+        "conceptos": [{"id_servicio": c.get("id_servicio"), "cantidad": c.get("cantidad")}
+                      for c in conceptos],
+    }
+    return proxy_backend("POST", "/facturas", datos)
+
+
+@app.route("/api/facturas/<folio>", methods=["GET"])
+def api_detalle_factura(folio):
+    if not FOLIO_RE.match(folio):
+        return jsonify({"mensaje": "Folio inválido"}), 400
+    return proxy_backend("GET", f"/facturas/{folio}")
+
+
+@app.route("/api/facturas/<folio>/cancelar", methods=["POST"])
+def api_cancelar_factura(folio):
+    rechazo = _rechazo("cancelar_factura", "Solo un Administrador puede cancelar facturas.")
+    if rechazo:
+        return rechazo
+    if not FOLIO_RE.match(folio):
+        return jsonify({"mensaje": "Folio inválido"}), 400
+    cuerpo = _json_objeto()
+    if cuerpo is None:
+        return jsonify({"mensaje": "El cuerpo de la petición debe ser un objeto JSON"}), 400
+    motivo = cuerpo.get("motivo")
+    return proxy_backend("POST", f"/facturas/{folio}/cancelar",
+                         {"motivo": motivo.strip() if isinstance(motivo, str) else motivo})
+
+
+@app.route("/api/pagos", methods=["POST"])
+def api_registrar_pago():
+    rechazo = _rechazo("registrar_pago", "Tu rol no puede registrar pagos.")
+    if rechazo:
+        return rechazo
+    cuerpo = _json_objeto()
+    if cuerpo is None:
+        return jsonify({"mensaje": "El cuerpo de la petición debe ser un objeto JSON"}), 400
+    datos = {k: v for k, v in cuerpo.items() if k in CAMPOS_PAGO}
+    if isinstance(datos.get("referencia"), str):
+        datos["referencia"] = datos["referencia"].strip() or None
+    if datos.get("referencia") is None:
+        datos.pop("referencia", None)
+    return proxy_backend("POST", "/pagos", datos)
 
 
 @app.route("/api/servicios", methods=["POST", "PUT", "DELETE"])

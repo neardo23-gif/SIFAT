@@ -1,23 +1,25 @@
 {% extends "app_base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Clientes · SIFAT{% endblock %}
 
 {% block main %}
-<h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Clientes</h1>
-<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Un cliente con facturas no se puede eliminar. Origen: {{ origen }}.</p>
-{% if error %}
-<div class="mt-6 flex items-start gap-3 rounded-xl border border-sello/40 bg-sello/10 p-4 text-[15px]" role="alert">
+{% set puede_escribir = not usa_mock and not aviso %}
+<div class="flex flex-wrap items-end justify-between gap-4">
   <div>
-    <p class="font-semibold">No pudimos cargar los datos</p>
-    <p class="text-mute">{{ error }}</p>
+    <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Clientes</h1>
+    <p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Un cliente con facturas no se elimina: se desactiva. Origen: {{ origen }}.</p>
   </div>
+  {% if puede_escribir and puede('crear_cliente') %}
+  <button type="button" class="btn btn-primary" data-action="nuevo-cliente">{{ icon('mas') }}Nuevo cliente</button>
+  {% endif %}
 </div>
-{% endif %}
-
+{% include "_avisos.html" %}
 
 <section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-cli">
   <h2 id="t-cli" class="sr-only">Lista de clientes</h2>
+  {% if clientes %}
   <div class="overflow-x-auto">
-    <table class="w-full min-w-[640px] text-left text-[15px]">
+    <table class="w-full min-w-[720px] text-left text-[15px]" id="tabla-clientes">
       <caption class="sr-only">Clientes registrados</caption>
       <thead>
         <tr class="border-b border-line text-[13px] text-mute">
@@ -26,6 +28,7 @@
           <th scope="col" class="px-4 py-3 font-medium">C.P. fiscal</th>
           <th scope="col" class="px-4 py-3 font-medium">Correo</th>
           <th scope="col" class="px-4 py-3 font-medium">Estado</th>
+          {% if puede_escribir and puede('editar_cliente') %}<th scope="col" class="px-4 py-3"><span class="sr-only">Acciones</span></th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -39,10 +42,88 @@
             {% if c.activo %}<span class="chip"><span class="dot bg-soft"></span>Activo</span>
             {% else %}<span class="chip text-mute"><span class="dot border border-mute"></span>Inactivo</span>{% endif %}
           </td>
+          {% if puede_escribir and puede('editar_cliente') %}
+          <td class="px-4 py-3.5 text-right">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="editar-cliente" data-id="{{ c.id_cliente }}" aria-label="Editar {{ c.razon_social }}">{{ icon('editar') }}Editar</button>
+          </td>
+          {% endif %}
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% else %}
+  <div class="px-6 py-16 text-center">
+    <div class="dither-chip mx-auto mb-5" aria-hidden="true"></div>
+    <p class="text-[17px] font-semibold">Todavía no hay clientes</p>
+    <p class="mx-auto mt-1 max-w-[40ch] text-[15px] text-mute">Da de alta el primero para poder facturarle.</p>
+  </div>
+  {% endif %}
 </section>
+
+{% if puede_escribir and (puede('crear_cliente') or puede('editar_cliente')) %}
+<script type="application/json" id="clientes-data">{{ clientes|tojson }}</script>
+
+<dialog id="dlg-cliente" class="modal w-[min(640px,calc(100vw-2rem))]" aria-labelledby="cli-titulo">
+  <form id="form-cliente" novalidate>
+    <div class="flex items-center justify-between gap-4 border-b border-line p-5">
+      <h2 id="cli-titulo" class="text-[22px] font-bold tracking-tight">Nuevo cliente</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Cerrar formulario">{{ icon('cerrar') }}</button>
+    </div>
+    <div class="max-h-[62vh] space-y-5 overflow-y-auto p-5">
+      <div class="grid gap-4 sm:grid-cols-[1fr_140px]">
+        <div>
+          <label class="label" for="c-rfc">RFC</label>
+          <input id="c-rfc" name="rfc" class="field font-mono" style="text-transform: uppercase" maxlength="13" autocomplete="off" spellcheck="false" required>
+          <p class="hint" id="c-rfc-hint">12 caracteres (persona moral) o 13 (persona física). No se puede cambiar después.</p>
+        </div>
+        <div>
+          <label class="label" for="c-cp">C.P. fiscal</label>
+          <input id="c-cp" name="cp_fiscal" class="field tabular-nums" inputmode="numeric" maxlength="5" autocomplete="off" required>
+        </div>
+      </div>
+      <div>
+        <label class="label" for="c-razon">Razón social</label>
+        <input id="c-razon" name="razon_social" class="field" maxlength="200" autocomplete="off" required>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="c-regimen">Régimen fiscal</label>
+          <select id="c-regimen" name="clave_regimen" class="field" required>
+            {% for r in catalogos['regimenes'] %}<option value="{{ r.clave }}">{{ r.clave }} · {{ r.descripcion }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label" for="c-uso">Uso de CFDI</label>
+          <select id="c-uso" name="clave_uso" class="field" required>
+            {% for u in catalogos['usos-cfdi'] %}<option value="{{ u.clave }}">{{ u.clave }} · {{ u.descripcion }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="c-email">Correo <span class="text-mute">(opcional)</span></label>
+          <input id="c-email" name="email" type="email" class="field" maxlength="120" autocomplete="off">
+        </div>
+        <div>
+          <label class="label" for="c-tel">Teléfono <span class="text-mute">(opcional)</span></label>
+          <input id="c-tel" name="telefono" class="field tabular-nums" inputmode="tel" maxlength="15" autocomplete="off">
+          <p class="hint">Solo números, de 10 a 15 dígitos.</p>
+        </div>
+      </div>
+      {% if puede('desactivar_cliente') %}
+      <label class="hidden items-center gap-2.5 rounded-xl border border-line px-4 py-3 text-[15px]" id="c-activo-wrap">
+        <input id="c-activo" name="activo" type="checkbox" class="h-4 w-4 accent-[#6b49f0]">
+        Cliente activo (se le pueden emitir facturas)
+      </label>
+      {% endif %}
+      <p id="cli-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-line p-4">
+      <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="cli-submit">Guardar cliente</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 {% endblock %}

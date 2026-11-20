@@ -1,18 +1,25 @@
 {% extends "app_base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Pagos · SIFAT{% endblock %}
 
 {% block main %}
-<h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Pagos</h1>
-<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Cada pago se liga a una factura y a una forma de pago del SAT. Origen: {{ origen }}.</p>
-{% if error %}
-<div class="mt-6 flex items-start gap-3 rounded-xl border border-sello/40 bg-sello/10 p-4 text-[15px]" role="alert">
+{% set puede_pagar = not usa_mock and not aviso and puede('registrar_pago') %}
+<div class="flex flex-wrap items-end justify-between gap-4">
   <div>
-    <p class="font-semibold">No pudimos cargar los datos</p>
-    <p class="text-mute">{{ error }}</p>
+    <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Pagos</h1>
+    <p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Cada pago se liga a una factura y a una forma de pago del SAT. Origen: {{ origen }}.</p>
   </div>
+  {% if puede_pagar %}
+  <button type="button" class="btn btn-primary" data-action="nuevo-pago"
+          {% if not facturas_vigentes %}disabled title="No hay facturas por cobrar"{% endif %}>
+    {{ icon('mas') }}Registrar pago
+  </button>
+  {% endif %}
 </div>
+{% include "_avisos.html" %}
+{% if puede_pagar and not facturas_vigentes %}
+<p class="mt-4 text-[14px] text-mute">No hay facturas por cobrar: todas están pagadas o canceladas.</p>
 {% endif %}
-
 
 <section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-pag">
   <h2 id="t-pag" class="sr-only">Lista de pagos</h2>
@@ -50,4 +57,48 @@
   </div>
   {% endif %}
 </section>
+
+{% if puede_pagar and facturas_vigentes %}
+<script type="application/json" id="pagos-config">{{ {'folio_inicial': folio_inicial}|tojson }}</script>
+
+<dialog id="dlg-pago" class="modal w-[min(560px,calc(100vw-2rem))]" aria-labelledby="pago-titulo">
+  <form id="form-pago" novalidate>
+    <div class="flex items-center justify-between gap-4 border-b border-line p-5">
+      <h2 id="pago-titulo" class="text-[22px] font-bold tracking-tight">Registrar pago</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Cerrar formulario">{{ icon('cerrar') }}</button>
+    </div>
+    <div class="space-y-5 p-5">
+      <div>
+        <label class="label" for="p-folio">Factura</label>
+        <select id="p-folio" class="field" required>
+          <option value="">Elige una factura por cobrar…</option>
+          {% for f in facturas_vigentes %}<option value="{{ f.folio }}">{{ f.folio }} · {{ f.cliente }} · {{ f.total|mxn }}</option>{% endfor %}
+        </select>
+        <p class="hint" id="p-saldo" aria-live="polite"></p>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="p-monto">Monto</label>
+          <input id="p-monto" type="number" min="0.01" step="0.01" inputmode="decimal" class="field tabular-nums" required>
+        </div>
+        <div>
+          <label class="label" for="p-forma">Forma de pago</label>
+          <select id="p-forma" class="field" required>
+            {% for f in catalogos['formas-pago'] %}{% if f.clave != '99' %}<option value="{{ f.clave }}" {% if f.clave == '03' %}selected{% endif %}>{{ f.clave }} · {{ f.descripcion }}</option>{% endif %}{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="label" for="p-ref">Referencia <span class="text-mute">(opcional)</span></label>
+        <input id="p-ref" class="field" maxlength="100" autocomplete="off" placeholder="Ej. SPEI-88213">
+      </div>
+      <p id="p-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-line p-4">
+      <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="p-submit">Registrar pago</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 {% endblock %}

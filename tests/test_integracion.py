@@ -223,8 +223,14 @@ PAGO = {"id_pago": 3, "folio": "FAC-0101", "fecha_pago": "2026-01-05", "clave_fo
         "forma_pago": "Transferencia electronica", "monto": 1160, "referencia": "SPEI-123"}
 
 
+def _datos_formulario_factura():
+    """Lo que pide /facturas después de la lista: clientes activos y el catálogo."""
+    return (RespuestaFalsa(200, {"clientes": [CLIENTE]}),
+            RespuestaFalsa(200, {"servicios": [_servicio(1, "Hosting")]}))
+
+
 def test_backend_facturas_transforma_y_renderiza(modo_real, red):
-    red.responder(RespuestaFalsa(200, {"facturas": [FACTURA]}))
+    red.responder(RespuestaFalsa(200, {"facturas": [FACTURA]}), *_datos_formulario_factura())
     pagina = html(modo_real.get("/facturas"))
 
     assert "FAC-0101" in pagina and "Cliente Backend SA" in pagina
@@ -244,10 +250,13 @@ def test_backend_clientes_transforma_y_renderiza(modo_real, red):
     assert "CLI-007" in pagina  # id numérico -> clave con ceros
     assert "CBA010101AA1" in pagina and "62000" in pagina
     assert red.llamadas[0]["url"] == "http://backend.test/clientes"
+    # Se listan también los inactivos, para poder reactivarlos
+    assert red.llamadas[0]["params"] == {"limite": 200, "incluir_inactivos": "true"}
 
 
 def test_backend_pagos_transforma_y_renderiza(modo_real, red):
-    red.responder(RespuestaFalsa(200, {"pagos": [PAGO, {**PAGO, "id_pago": 4, "referencia": None}]}))
+    red.responder(RespuestaFalsa(200, {"pagos": [PAGO, {**PAGO, "id_pago": 4, "referencia": None}]}),
+                  RespuestaFalsa(200, {"facturas": []}))
     pagina = html(modo_real.get("/pagos"))
 
     assert "05 ene 2026" in pagina
@@ -282,6 +291,10 @@ def test_backend_sin_clave_no_llama_a_la_red(modo_real, red, monkeypatch, ruta):
                                          ("/pagos", "pagos")])
 def test_backend_lista_vacia(modo_real, red, ruta, llave):
     red.responder(RespuestaFalsa(200, {llave: []}))
+    if ruta == "/facturas":
+        red.responder(*_datos_formulario_factura())
+    if ruta == "/pagos":
+        red.responder(RespuestaFalsa(200, {"facturas": []}))
     assert modo_real.get(ruta).status_code == 200
 
 

@@ -1,0 +1,17 @@
+{# Mensajes de la pantalla: error = no se cargó la lista; aviso = no se podrá escribir. #}
+{% from "_icons.html" import icon %}
+{% if error %}
+<div class="mt-6 flex items-start gap-3 rounded-xl border border-sello/40 bg-sello/10 p-4 text-[15px]" role="alert">
+  <span class="mt-0.5 text-sello">{{ icon('alerta') }}</span>
+  <div>
+    <p class="font-semibold">No pudimos cargar los datos</p>
+    <p class="text-mute">{{ error }}</p>
+  </div>
+</div>
+{% endif %}
+{% if aviso and not error %}
+<div class="mt-6 flex items-start gap-3 rounded-xl border border-line bg-raise p-4 text-[15px]" role="status">
+  <span class="mt-0.5 text-sello">{{ icon('alerta') }}</span>
+  <p class="text-mute">{{ aviso }}</p>
+</div>
+{% endif %}

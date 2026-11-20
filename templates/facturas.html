@@ -1,24 +1,32 @@
 {% extends "app_base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Facturas · SIFAT{% endblock %}
 
 {% block main %}
-<h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Facturas</h1>
-<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Se guardan en MySQL con su detalle y pagos. Origen: {{ origen }}.</p>
-{% if error %}
-<div class="mt-6 flex items-start gap-3 rounded-xl border border-sello/40 bg-sello/10 p-4 text-[15px]" role="alert">
+{% set puede_emitir = not usa_mock and not aviso and puede('emitir_factura') %}
+<div class="flex flex-wrap items-end justify-between gap-4">
   <div>
-    <p class="font-semibold">No pudimos cargar los datos</p>
-    <p class="text-mute">{{ error }}</p>
+    <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Facturas</h1>
+    <p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Se guardan en MySQL con su detalle y pagos. Una factura no se borra: se cancela. Origen: {{ origen }}.</p>
   </div>
+  {% if puede_emitir %}
+  <button type="button" class="btn btn-primary" data-action="nueva-factura"
+          {% if not clientes_activos or not servicios_activos %}disabled title="Necesitas al menos un cliente y un servicio activos"{% endif %}>
+    {{ icon('mas') }}Nueva factura
+  </button>
+  {% endif %}
 </div>
+{% include "_avisos.html" %}
+{% if puede_emitir and (not clientes_activos or not servicios_activos) %}
+<p class="mt-4 text-[14px] text-mute">Para emitir una factura necesitas al menos un cliente activo y un servicio activo en el catálogo.</p>
 {% endif %}
-
 
 <section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-fact">
   <h2 id="t-fact" class="sr-only">Lista de facturas</h2>
+  {% if facturas %}
   <div class="overflow-x-auto">
-    <table class="w-full min-w-[680px] text-left text-[15px]">
-      <caption class="sr-only">Facturas emitidas</caption>
+    <table class="w-full min-w-[680px] text-left text-[15px]" id="tabla-facturas">
+      <caption class="sr-only">Facturas emitidas{% if not usa_mock %}. Selecciona un folio para ver el detalle.{% endif %}</caption>
       <thead>
         <tr class="border-b border-line text-[13px] text-mute">
           <th scope="col" class="px-4 py-3 font-medium">Folio</th>
@@ -31,8 +39,10 @@
       </thead>
       <tbody>
         {% for f in facturas %}
-        <tr class="row">
-          <td class="px-4 py-3.5 font-mono text-[13px]">{{ f.folio }}</td>
+        <tr class="row" {% if not usa_mock %}data-folio="{{ f.folio }}"{% endif %}>
+          <td class="px-4 py-3.5 font-mono text-[13px]">
+            {% if not usa_mock %}<button type="button" class="row-open font-mono" data-action="ver-factura" data-folio="{{ f.folio }}">{{ f.folio }}</button>{% else %}{{ f.folio }}{% endif %}
+          </td>
           <td class="px-4 py-3.5 font-medium">{{ f.cliente }}</td>
           <td class="whitespace-nowrap px-4 py-3.5 text-mute">{{ f.fecha }}</td>
           <td class="px-4 py-3.5 text-right tabular-nums text-mute">{{ f.subtotal|mxn }}</td>
@@ -47,5 +57,137 @@
       </tbody>
     </table>
   </div>
+  {% else %}
+  <div class="px-6 py-16 text-center">
+    <div class="dither-chip mx-auto mb-5" aria-hidden="true"></div>
+    <p class="text-[17px] font-semibold">Todavía no hay facturas</p>
+    <p class="mx-auto mt-1 max-w-[40ch] text-[15px] text-mute">Cuando emitas una aparecerá aquí con su folio.</p>
+  </div>
+  {% endif %}
 </section>
+
+{% if not usa_mock %}
+<script type="application/json" id="facturas-config">{{ {
+  'puede_cancelar': puede('cancelar_factura'),
+  'puede_pagar': puede('registrar_pago'),
+  'url_pagos': url_for('pagos'),
+  'servicios': servicios_activos,
+}|tojson }}</script>
+
+{# ---------- Detalle de factura ---------- #}
+<dialog id="dlg-factura" class="modal w-[min(760px,calc(100vw-2rem))]" aria-labelledby="fac-titulo">
+  <div class="flex items-start justify-between gap-4 border-b border-line p-5">
+    <div class="min-w-0">
+      <p class="text-[13px] text-mute" id="fac-sub"></p>
+      <h2 id="fac-titulo" class="mt-1 font-mono text-[24px] font-bold leading-tight tracking-tight"></h2>
+    </div>
+    <button type="button" class="icon-btn" data-close aria-label="Cerrar detalle">{{ icon('cerrar') }}</button>
+  </div>
+  <div class="max-h-[62vh] overflow-y-auto p-5">
+    <p id="fac-cargando" class="text-[15px] text-mute">Cargando…</p>
+    <p id="fac-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
+    <div id="fac-cuerpo" class="hidden">
+      <dl class="grid grid-cols-2 gap-x-6 gap-y-4 text-[15px] sm:grid-cols-3" id="fac-datos"></dl>
+      <p id="fac-motivo" class="mt-5 hidden rounded-lg border border-line bg-raise px-3 py-2 text-[14px] text-mute"></p>
+      <h3 class="mt-7 text-[15px] font-semibold">Conceptos</h3>
+      <div class="mt-3 overflow-x-auto rounded-xl border border-line">
+        <table class="w-full min-w-[520px] text-left text-[14px]">
+          <thead>
+            <tr class="border-b border-line text-[13px] text-mute">
+              <th scope="col" class="px-3 py-2 font-medium">Servicio</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">Cantidad</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">Precio</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">Importe</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">IVA</th>
+            </tr>
+          </thead>
+          <tbody id="fac-conceptos" class="divide-y divide-line"></tbody>
+        </table>
+      </div>
+      <dl class="ml-auto mt-4 w-full max-w-[280px] space-y-1.5 text-[15px] tabular-nums" id="fac-totales"></dl>
+      <h3 class="mt-7 text-[15px] font-semibold">Pagos</h3>
+      <ul id="fac-pagos" class="mt-3 divide-y divide-line rounded-xl border border-line"></ul>
+    </div>
+  </div>
+  <div class="flex flex-wrap justify-between gap-2 border-t border-line p-4">
+    <button type="button" class="btn btn-danger hidden" data-action="pedir-cancelar" id="fac-cancelar">{{ icon('borrar') }}Cancelar factura</button>
+    <span></span>
+    <div class="flex gap-2">
+      <button type="button" class="btn btn-ghost" data-close>Cerrar</button>
+      <a href="#" class="btn btn-primary hidden" id="fac-pagar">{{ icon('pagos') }}Registrar pago</a>
+    </div>
+  </div>
+</dialog>
+
+{# ---------- Confirmar cancelación ---------- #}
+<dialog id="dlg-cancelar" class="modal w-[min(520px,calc(100vw-2rem))]" aria-labelledby="can-titulo">
+  <form id="form-cancelar" novalidate>
+    <div class="p-6">
+      <h2 id="can-titulo" class="text-[22px] font-bold tracking-tight">¿Cancelar la factura <span class="font-mono" id="can-folio"></span>?</h2>
+      <p class="mt-2 text-[15px] text-mute">La factura queda como cancelada y ya no admite pagos. No se puede deshacer.</p>
+      <label class="label mt-5" for="can-motivo">Motivo de la cancelación</label>
+      <textarea id="can-motivo" rows="2" maxlength="255" class="field resize-none" placeholder="Ej. Error en los datos del cliente"></textarea>
+      <p class="hint">Mínimo 5 caracteres. Queda guardado en la factura.</p>
+      <p id="can-error" class="mt-3 hidden text-[14px] text-sello" role="alert"></p>
+    </div>
+    <div class="flex justify-between gap-2 border-t border-line p-4">
+      <button type="button" class="btn btn-light" data-close>Volver</button>
+      <button type="submit" class="btn btn-danger" id="can-submit">Cancelar factura</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{% if puede_emitir and clientes_activos and servicios_activos %}
+{# ---------- Nueva factura ---------- #}
+<dialog id="dlg-nueva" class="modal w-[min(820px,calc(100vw-2rem))]" aria-labelledby="nueva-titulo">
+  <form id="form-factura" novalidate>
+    <div class="flex items-center justify-between gap-4 border-b border-line p-5">
+      <h2 id="nueva-titulo" class="text-[22px] font-bold tracking-tight">Nueva factura</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Cerrar formulario">{{ icon('cerrar') }}</button>
+    </div>
+    <div class="max-h-[64vh] space-y-5 overflow-y-auto p-5">
+      <div>
+        <label class="label" for="n-cliente">Cliente</label>
+        <select id="n-cliente" class="field" required>
+          <option value="">Elige un cliente…</option>
+          {% for c in clientes_activos %}<option value="{{ c.id_cliente }}">{{ c.razon_social }} · {{ c.rfc }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="n-forma">Forma de pago</label>
+          <select id="n-forma" class="field" required>
+            {% for f in catalogos['formas-pago'] %}<option value="{{ f.clave }}" {% if f.clave == '03' %}selected{% endif %}>{{ f.clave }} · {{ f.descripcion }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label" for="n-metodo">Método de pago</label>
+          <select id="n-metodo" class="field" required>
+            {% for m in catalogos['metodos-pago'] %}<option value="{{ m.clave }}" {% if m.clave == 'PUE' %}selected{% endif %}>{{ m.clave }} · {{ m.descripcion }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <fieldset>
+        <legend class="label">Conceptos</legend>
+        <div id="n-conceptos" class="space-y-2"></div>
+        <button type="button" class="btn btn-ghost btn-sm mt-3" data-action="add-concepto">{{ icon('mas') }}Agregar concepto</button>
+      </fieldset>
+      <div class="rounded-xl border border-line bg-raise p-4">
+        <dl class="ml-auto w-full max-w-[280px] space-y-1.5 text-[15px] tabular-nums">
+          <div class="flex justify-between"><dt class="text-mute">Subtotal</dt><dd id="n-subtotal">$0.00</dd></div>
+          <div class="flex justify-between"><dt class="text-mute">IVA</dt><dd id="n-iva">$0.00</dd></div>
+          <div class="flex justify-between border-t border-line pt-1.5 font-semibold"><dt>Total</dt><dd id="n-total">$0.00</dd></div>
+        </dl>
+        <p class="hint mt-3">Estimado con los precios actuales del catálogo. El servidor calcula el total definitivo al emitir.</p>
+      </div>
+      <p id="n-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-line p-4">
+      <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="n-submit">Emitir factura</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 {% endblock %}
