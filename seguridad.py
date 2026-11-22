@@ -21,6 +21,7 @@ PERMISOS = {
     "emitir_factura": {ADMIN, FACTURISTA},
     "cancelar_factura": {ADMIN},
     "registrar_pago": {ADMIN, FACTURISTA},
+    "administrar_usuarios": {ADMIN},
 }
 
 

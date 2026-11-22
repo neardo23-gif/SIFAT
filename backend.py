@@ -84,6 +84,7 @@ ETIQUETAS = {
     "clave_forma_pago": "forma de pago", "clave_metodo_pago": "método de pago",
     "conceptos": "conceptos", "id_servicio": "servicio", "cantidad": "cantidad",
     "motivo": "motivo", "folio": "factura", "monto": "monto", "referencia": "referencia",
+    "nombre": "nombre", "apellidos": "apellidos", "password": "contraseña", "rol": "rol",
 }
 
 

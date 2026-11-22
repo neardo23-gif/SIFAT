@@ -7,6 +7,9 @@
   ('clientes', 'Clientes', url_for('clientes.pantalla')),
   ('pagos', 'Pagos', url_for('pagos.pantalla'))
 ] %}
+{% if puede('administrar_usuarios') %}
+{% set nav = nav + [('usuarios', 'Usuarios', url_for('usuarios.pantalla'))] %}
+{% endif %}
 
 {% block body %}
 <div class="min-h-screen lg:grid lg:grid-cols-[248px_1fr]">

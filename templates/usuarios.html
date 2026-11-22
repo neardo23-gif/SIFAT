@@ -1,0 +1,113 @@
+{% extends "app_base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Usuarios · SIFAT{% endblock %}
+
+{% block main %}
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Usuarios</h1>
+    <p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">Personas que pueden entrar a SIFAT. Solo un Administrador las da de alta. Origen: {{ origen }}.</p>
+  </div>
+  {% if not error %}
+  <button type="button" class="btn btn-primary" data-action="nuevo-usuario">{{ icon('mas') }}Nuevo usuario</button>
+  {% endif %}
+</div>
+{% include "_avisos.html" %}
+
+<section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-usr">
+  <h2 id="t-usr" class="sr-only">Lista de usuarios</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[680px] text-left text-[15px]">
+      <caption class="sr-only">Usuarios registrados</caption>
+      <thead>
+        <tr class="border-b border-line text-[13px] text-mute">
+          <th scope="col" class="px-4 py-3 font-medium">Nombre</th>
+          <th scope="col" class="px-4 py-3 font-medium">Correo</th>
+          <th scope="col" class="px-4 py-3 font-medium">Rol</th>
+          <th scope="col" class="px-4 py-3 font-medium">Último acceso</th>
+          <th scope="col" class="px-4 py-3 font-medium">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr class="row">
+          <td class="px-4 py-3.5 font-medium">{{ u.nombre }}{% if u.id == yo %}<span class="ml-2 text-[12px] text-mute">(tú)</span>{% endif %}</td>
+          <td class="px-4 py-3.5 text-mute">{{ u.email }}</td>
+          <td class="px-4 py-3.5">{{ u.rol }}</td>
+          <td class="whitespace-nowrap px-4 py-3.5 text-mute">{{ u.ultimo_acceso }}</td>
+          <td class="px-4 py-3.5">
+            {% if not u.activo %}<span class="chip text-mute"><span class="dot border border-mute"></span>Inactivo</span>
+            {% elif not u.tiene_contrasena %}<span class="chip"><span class="dot bg-sello"></span>Sin contraseña</span>
+            {% else %}<span class="chip"><span class="dot bg-soft"></span>Activo</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<dialog id="dlg-usuario" class="modal w-[min(620px,calc(100vw-2rem))]" aria-labelledby="usr-titulo">
+  <form id="form-usuario" novalidate autocomplete="off">
+    <div class="flex items-center justify-between gap-4 border-b border-line p-5">
+      <h2 id="usr-titulo" class="text-[22px] font-bold tracking-tight">Nuevo usuario</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Cerrar formulario">{{ icon('cerrar') }}</button>
+    </div>
+    <div class="max-h-[64vh] space-y-5 overflow-y-auto p-5">
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="u-nombre">Nombre(s)</label>
+          <input id="u-nombre" class="field" maxlength="50" autocomplete="off" required>
+        </div>
+        <div>
+          <label class="label" for="u-apellidos">Apellidos</label>
+          <input id="u-apellidos" class="field" maxlength="49" autocomplete="off" required>
+        </div>
+      </div>
+      <p class="hint -mt-3">Solo letras (con acentos), espacios, guiones o apóstrofos. Mínimo 2 letras cada uno.</p>
+      <div class="grid gap-4 sm:grid-cols-[1fr_180px]">
+        <div>
+          <label class="label" for="u-email">Correo</label>
+          <input id="u-email" type="email" class="field" maxlength="120" autocomplete="off" spellcheck="false" required>
+          <p class="hint">Con este correo inicia sesión.</p>
+        </div>
+        <div>
+          <label class="label" for="u-rol">Rol</label>
+          <select id="u-rol" class="field" required>
+            {% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="u-pass">Contraseña</label>
+          <div class="relative">
+            <input id="u-pass" type="password" class="field field-pr" maxlength="128" autocomplete="new-password" required aria-describedby="u-reglas">
+            <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="u-pass" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+          </div>
+        </div>
+        <div>
+          <label class="label" for="u-pass2">Confirmar contraseña</label>
+          <div class="relative">
+            <input id="u-pass2" type="password" class="field field-pr" maxlength="128" autocomplete="new-password" required>
+            <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="u-pass2" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+          </div>
+        </div>
+      </div>
+      <ul id="u-reglas" class="grid gap-1 text-[14px] text-mute sm:grid-cols-2" aria-live="polite">
+        <li data-regla="largo">○ Al menos 12 caracteres</li>
+        <li data-regla="letras">○ Letras y números</li>
+        <li data-regla="personal">○ Sin tu nombre ni tu correo, no repetitiva</li>
+        <li data-regla="igual">○ Las dos contraseñas coinciden</li>
+      </ul>
+      <p id="usr-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-line p-4">
+      <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="usr-submit">Registrar usuario</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/usuarios.js') }}" defer></script>{% endblock %}
