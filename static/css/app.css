@@ -229,3 +229,8 @@ dialog.modal[open]::backdrop { opacity: 1; transition-duration: .22s; }
   .btn, .icon-btn { transition: none; }
   .btn:active, .icon-btn:active { transform: none; }
 }
+
+/* Los componentes de arriba fijan su `display` y, como este archivo carga después de
+   Tailwind, le ganaban a la utilidad `hidden`: un botón "oculto" seguía viéndose.
+   Con dos clases la regla es más específica y `hidden` vuelve a ocultar. */
+.btn.hidden, .icon-btn.hidden, .chip.hidden, .dot.hidden, .label.hidden, .nav-link.hidden, .stat.hidden { display: none; }

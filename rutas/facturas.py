@@ -3,14 +3,16 @@ from flask import Blueprint, jsonify, render_template
 
 import backend
 import seguridad
-from rutas.comun import FOLIO_RE, JSON_INVALIDO, contexto_base, fecha_corta, json_objeto
+from rutas.comun import (FOLIO_RE, JSON_INVALIDO, contexto_base, fecha_corta, json_objeto,
+                         pagina_pedida, paginacion)
 
 bp = Blueprint("facturas", __name__)
 
 
 @bp.route("/facturas")
 def pantalla():
-    datos, error = backend.consultar_backend("/facturas", "facturas")
+    pagina = pagina_pedida()
+    datos, hay_mas, error = backend.consultar_pagina("/facturas", "facturas", pagina)
     filas = [{"folio": f["folio"], "cliente": f["cliente"], "fecha": fecha_corta(f["fecha_emision"]),
               "subtotal": f["subtotal"], "iva": f["iva"], "total": f["total"],
               "estatus": f["estatus"]} for f in datos]
@@ -22,7 +24,7 @@ def pantalla():
     # Si ni la lista cargó, el backend no responde: no tiene caso pedir más datos
     if seguridad.puede("emitir_factura") and not error:
         catalogos, error_cat = backend.catalogos_sat()
-        crudos, error_cli = backend.consultar_backend("/clientes", "clientes")
+        crudos, error_cli = backend.consultar_todo("/clientes", "clientes")
         clientes_activos = [{"id_cliente": c["id_cliente"], "razon_social": c["razon_social"],
                              "rfc": c["rfc"]} for c in crudos]
         servicios, error_srv = backend.listar_servicios()
@@ -37,7 +39,8 @@ def pantalla():
             aviso = f"No se podrán emitir facturas por ahora: {problema}"
     return render_template("facturas.html", facturas=filas, error=error, aviso=aviso,
                            catalogos=catalogos, clientes_activos=clientes_activos,
-                           servicios_activos=servicios_activos, **contexto_base("facturas"))
+                           servicios_activos=servicios_activos, paginas=paginacion(pagina, hay_mas),
+                           **contexto_base("facturas"))
 
 
 @bp.route("/api/facturas", methods=["POST"])

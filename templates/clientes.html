@@ -18,7 +18,7 @@
 <section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-cli">
   <h2 id="t-cli" class="sr-only">Lista de clientes</h2>
   {% if clientes %}
-  <div class="overflow-x-auto">
+  <div class="relative overflow-x-auto">
     <table class="w-full min-w-[720px] text-left text-[15px]" id="tabla-clientes">
       <caption class="sr-only">Clientes registrados</caption>
       <thead>
@@ -59,6 +59,7 @@
     <p class="mx-auto mt-1 max-w-[40ch] text-[15px] text-mute">Da de alta el primero para poder facturarle.</p>
   </div>
   {% endif %}
+  {% include "_paginacion.html" %}
 </section>
 
 {% if puede_escribir and (puede('crear_cliente') or puede('editar_cliente')) %}

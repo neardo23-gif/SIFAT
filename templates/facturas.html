@@ -24,7 +24,7 @@
 <section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-fact">
   <h2 id="t-fact" class="sr-only">Lista de facturas</h2>
   {% if facturas %}
-  <div class="overflow-x-auto">
+  <div class="relative overflow-x-auto">
     <table class="w-full min-w-[680px] text-left text-[15px]" id="tabla-facturas">
       <caption class="sr-only">Facturas emitidas. Selecciona un folio para ver el detalle.</caption>
       <thead>
@@ -64,6 +64,7 @@
     <p class="mx-auto mt-1 max-w-[40ch] text-[15px] text-mute">Cuando emitas una aparecerá aquí con su folio.</p>
   </div>
   {% endif %}
+  {% include "_paginacion.html" %}
 </section>
 
 <script type="application/json" id="facturas-config">{{ {

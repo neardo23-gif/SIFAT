@@ -1,5 +1,6 @@
 """Portada, inicio y cierre de sesión, y comprobación de vida."""
 import secrets
+import time
 
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
@@ -32,6 +33,7 @@ def login():
     session.permanent = True
     session["usuario"] = {k: usuario[k] for k in ("id_usuario", "nombre", "email", "rol")}
     session["csrf"] = secrets.token_urlsafe(32)
+    session["verificado"] = time.time()  # recién validado por el backend
     return redirect(url_for("catalogo.pantalla"))
 
 

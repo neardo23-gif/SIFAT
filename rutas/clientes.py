@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, render_template
 
 import backend
 import seguridad
-from rutas.comun import JSON_INVALIDO, contexto_base, json_objeto
+from rutas.comun import JSON_INVALIDO, contexto_base, json_objeto, pagina_pedida, paginacion
 
 bp = Blueprint("clientes", __name__)
 
@@ -14,7 +14,8 @@ OPCIONALES = {"email", "telefono"}
 
 @bp.route("/clientes")
 def pantalla():
-    datos, error = backend.consultar_backend("/clientes", "clientes", incluir_inactivos="true")
+    pagina = pagina_pedida()
+    datos, hay_mas, error = backend.consultar_pagina("/clientes", "clientes", pagina, incluir_inactivos="true")
     filas = [{"id": f"CLI-{c['id_cliente']:03d}", "id_cliente": c["id_cliente"],
               "razon_social": c["razon_social"], "rfc": c["rfc"], "cp": c["cp_fiscal"],
               "email": c.get("email") or "-", "email_crudo": c.get("email") or "",
@@ -30,7 +31,8 @@ def pantalla():
         if error_cat:
             aviso = f"No se podrán guardar clientes por ahora: {error_cat}"
     return render_template("clientes.html", clientes=filas, error=error, aviso=aviso,
-                           catalogos=catalogos, **contexto_base("clientes"))
+                           catalogos=catalogos, paginas=paginacion(pagina, hay_mas),
+                           **contexto_base("clientes"))
 
 
 def _limpiar(cuerpo, permitidos):

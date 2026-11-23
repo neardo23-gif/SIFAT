@@ -34,3 +34,17 @@ def mxn(valor):
         return "${:,.2f}".format(float(valor))
     except (TypeError, ValueError):
         return "-"
+
+
+def pagina_pedida():
+    """El número de página de ?pagina=N (1 si falta o no es válido)."""
+    try:
+        return max(1, min(int(request.args.get("pagina", 1)), 10000))
+    except ValueError:
+        return 1
+
+
+def paginacion(pagina, hay_mas, **extra):
+    """Lo que necesita _paginacion.html. `extra` son otros parámetros a conservar en los enlaces."""
+    return {"pagina": pagina, "hay_mas": hay_mas, "anterior": pagina - 1 if pagina > 1 else None,
+            "siguiente": pagina + 1 if hay_mas else None, "extra": {k: v for k, v in extra.items() if v}}

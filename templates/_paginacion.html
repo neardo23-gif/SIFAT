@@ -1,0 +1,15 @@
+{# Enlaces Anterior / Siguiente. Recibe `paginas` de rutas.comun.paginacion(). #}
+{% from "_icons.html" import icon %}
+{% if paginas and (paginas.anterior or paginas.siguiente) %}
+<nav class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[14px] text-mute" aria-label="Páginas">
+  <p>Página {{ paginas.pagina }}</p>
+  <div class="flex items-center gap-2">
+    {% if paginas.anterior %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for(request.endpoint, pagina=paginas.anterior, **paginas.extra) }}" rel="prev">{{ icon('flecha-izq') }}Anterior</a>
+    {% else %}<span class="btn btn-ghost btn-sm pointer-events-none opacity-40" aria-hidden="true">{{ icon('flecha-izq') }}Anterior</span>{% endif %}
+    {% if paginas.siguiente %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for(request.endpoint, pagina=paginas.siguiente, **paginas.extra) }}" rel="next">Siguiente{{ icon('flecha-der') }}</a>
+    {% else %}<span class="btn btn-ghost btn-sm pointer-events-none opacity-40" aria-hidden="true">Siguiente{{ icon('flecha-der') }}</span>{% endif %}
+  </div>
+</nav>
+{% endif %}

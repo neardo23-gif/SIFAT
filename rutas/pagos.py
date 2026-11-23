@@ -3,7 +3,8 @@ from flask import Blueprint, jsonify, render_template, request
 
 import backend
 import seguridad
-from rutas.comun import FOLIO_RE, JSON_INVALIDO, contexto_base, fecha_corta, json_objeto
+from rutas.comun import (FOLIO_RE, JSON_INVALIDO, contexto_base, fecha_corta, json_objeto,
+                         pagina_pedida, paginacion)
 
 bp = Blueprint("pagos", __name__)
 
@@ -12,7 +13,8 @@ CAMPOS_PAGO = {"folio", "clave_forma_pago", "monto", "referencia"}
 
 @bp.route("/pagos")
 def pantalla():
-    datos, error = backend.consultar_backend("/pagos", "pagos")
+    pagina = pagina_pedida()
+    datos, hay_mas, error = backend.consultar_pagina("/pagos", "pagos", pagina)
     filas = [{"id": p["id_pago"], "folio": p["folio"], "fecha": fecha_corta(p["fecha_pago"]),
               "forma": f"{p['clave_forma_pago']} {p['forma_pago']}", "monto": p["monto"],
               "referencia": p.get("referencia") or "-"} for p in datos]
@@ -21,7 +23,7 @@ def pantalla():
     catalogos = dict(backend.CATALOGOS_VACIOS)
     if seguridad.puede("registrar_pago") and not error:
         catalogos, error_cat = backend.catalogos_sat()
-        crudas, error_fac = backend.consultar_backend("/facturas", "facturas", estatus="vigente")
+        crudas, error_fac = backend.consultar_todo("/facturas", "facturas", estatus="vigente")
         vigentes = [{"folio": f["folio"], "cliente": f["cliente"], "total": f["total"]} for f in crudas]
         problema = error_cat or error_fac
         if problema:
@@ -31,7 +33,8 @@ def pantalla():
     folio_inicial = folio if FOLIO_RE.match(folio) else ""
     return render_template("pagos.html", pagos=filas, error=error, aviso=aviso,
                            catalogos=catalogos, facturas_vigentes=vigentes,
-                           folio_inicial=folio_inicial, **contexto_base("pagos"))
+                           folio_inicial=folio_inicial, paginas=paginacion(pagina, hay_mas),
+                           **contexto_base("pagos"))
 
 
 @bp.route("/api/pagos", methods=["POST"])

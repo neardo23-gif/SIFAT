@@ -77,7 +77,11 @@
       const a = e.target.closest('[data-action="nuevo-pago"]');
       if (a) abrir('');
     });
-    // Viene del detalle de una factura: /pagos?folio=FAC-0001
-    if (cfg.folio_inicial) abrir(cfg.folio_inicial);
+    // Viene del detalle de una factura: /pagos?folio=FAC-0001. Se quita ?folio de la
+    // dirección para que, al recargar después de pagar, el formulario no se abra otra vez.
+    if (cfg.folio_inicial) {
+      abrir(cfg.folio_inicial);
+      try { history.replaceState(null, '', location.pathname); } catch (_) { /* sin History API */ }
+    }
   })();
 })();

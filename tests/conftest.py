@@ -7,6 +7,7 @@ respuestas falsas de `requests`, así que no hace falta conexión ni claves.
 import json
 import os
 import sys
+import time
 
 import pytest
 import requests
@@ -31,6 +32,7 @@ def con_csrf(cliente, usuario=ADMIN):
         s["csrf"] = CSRF
         if usuario:
             s["usuario"] = usuario
+            s["verificado"] = time.time()  # sesión recién revalidada
     cliente.environ_base["HTTP_X_CSRF_TOKEN"] = CSRF
     return cliente
 

@@ -1,0 +1,55 @@
+{% extends "app_base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Mi cuenta · SIFAT{% endblock %}
+
+{% block main %}
+<h1 class="text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Mi cuenta</h1>
+<p class="mt-1.5 max-w-[56ch] text-[15px] text-mute">{{ usuario_actual().nombre }} · {{ usuario_actual().email }} · {{ usuario_actual().rol }}</p>
+
+<section class="mt-8 max-w-[640px] rounded-2xl border border-line bg-panel" aria-labelledby="t-pass">
+  <form id="form-cuenta" novalidate autocomplete="off"
+        data-nombre="{{ usuario_actual().nombre }}" data-email="{{ usuario_actual().email }}">
+    <div class="border-b border-line p-5">
+      <h2 id="t-pass" class="text-[20px] font-bold tracking-tight">Cambiar mi contraseña</h2>
+      <p class="mt-1 text-[14px] text-mute">Si te equivocas 5 veces en la contraseña actual, la cuenta se bloquea 15 minutos.</p>
+    </div>
+    <div class="space-y-5 p-5">
+      <div>
+        <label class="label" for="c-actual">Contraseña actual</label>
+        <div class="relative">
+          <input id="c-actual" type="password" class="field field-pr" maxlength="128" autocomplete="current-password">
+          <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="c-actual" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="c-nueva">Contraseña nueva</label>
+          <div class="relative">
+            <input id="c-nueva" type="password" class="field field-pr" maxlength="128" autocomplete="new-password" aria-describedby="c-reglas">
+            <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="c-nueva" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+          </div>
+        </div>
+        <div>
+          <label class="label" for="c-nueva2">Confirmar contraseña nueva</label>
+          <div class="relative">
+            <input id="c-nueva2" type="password" class="field field-pr" maxlength="128" autocomplete="new-password">
+            <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="c-nueva2" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+          </div>
+        </div>
+      </div>
+      <ul id="c-reglas" class="grid gap-1 text-[14px] text-mute sm:grid-cols-2" aria-live="polite">
+        <li data-regla="largo">○ Al menos 12 caracteres</li>
+        <li data-regla="letras">○ Letras y números</li>
+        <li data-regla="personal">○ Sin tu nombre ni tu correo, no repetitiva</li>
+        <li data-regla="igual">○ Las dos contraseñas coinciden</li>
+      </ul>
+      <p id="cuenta-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
+    </div>
+    <div class="flex justify-end border-t border-line p-4">
+      <button type="submit" class="btn btn-primary" id="cuenta-submit">Cambiar contraseña</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/cuenta.js') }}" defer></script>{% endblock %}

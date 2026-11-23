@@ -26,17 +26,15 @@ Usuario ──HTTPS──► EC2 (IP elástica, <ip>.sslip.io)
 | Bucket S3 privado | `sifat-despliegue-<cuenta>-<sufijo>` (código y `.env`) |
 
 ## Publicar una versión nueva
-El servidor instala lo que hay en el bucket cuando arranca por primera vez. Para actualizar:
-1. Haz commit en ambos repos.
-2. Sube el código nuevo (solo lo que tiene commit, nunca el `.env`):
-   ```bash
-   git -C ~/Desktop/SIFAT archive --format=zip -o /tmp/front.zip HEAD
-   git -C ~/Desktop/SIFAT-BACKEND archive --format=zip -o /tmp/backend.zip HEAD
-   aws s3 cp /tmp/front.zip   s3://<bucket>/front.zip
-   aws s3 cp /tmp/backend.zip s3://<bucket>/backend.zip
-   ```
-3. Reemplaza la instancia: termínala y lanza otra con la misma interfaz de red (conserva la IP)
-   y `arranque.sh` como user data, con `__BUCKET__`, `__REGION__` y `__DOMINIO__` reemplazados.
+Con el lab encendido y sus credenciales en `~/.aws/credentials`:
+```bash
+./deploy/aws-academy/publicar.sh
+```
+Empaqueta lo que tiene commit en ambos repos (nunca el `.env`), lo sube al bucket y actualiza
+el servidor por Session Manager con `actualizar-servidor.sh`. Conserva la IP, el certificado y
+los `.env`. Si el front no responde después, regresa solo a la versión anterior.
+
+`arranque.sh` solo se usa para crear un servidor nuevo desde cero (user data de la EC2).
 
 ## Limitaciones del laboratorio
 - Al terminar la sesión del lab la instancia se apaga, y el sitio no responde hasta que vuelves

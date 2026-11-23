@@ -35,7 +35,7 @@
     <div class="border-t border-line px-5 py-4 text-[13px]">
       {% if usuario_actual() %}
       <p class="font-semibold text-[#f2f2f2]">{{ usuario_actual().nombre }}</p>
-      <p class="text-mute">{{ usuario_actual().rol }}</p>
+      <p class="text-mute">{{ usuario_actual().rol }} · <a href="{{ url_for('cuenta.pantalla') }}" class="underline-offset-2 hover:underline {{ 'text-[#f2f2f2]' if active == 'cuenta' }}">Mi cuenta</a></p>
       <form action="{{ url_for('auth.logout') }}" method="post" class="mb-3 mt-2">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-ghost btn-sm w-full justify-center">Cerrar sesión</button>
@@ -54,10 +54,13 @@
         <a href="{{ url_for('auth.portada') }}" class="logo inline-flex items-center gap-2.5 text-[17px] font-bold tracking-tight">
           <span class="logo-mark" aria-hidden="true"></span>SIFAT
         </a>
-        <form action="{{ url_for('auth.logout') }}" method="post">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-ghost btn-sm">Salir</button>
-        </form>
+        <div class="flex items-center gap-1">
+          <a href="{{ url_for('cuenta.pantalla') }}" class="btn btn-ghost btn-sm">Mi cuenta</a>
+          <form action="{{ url_for('auth.logout') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-ghost btn-sm">Salir</button>
+          </form>
+        </div>
       </div>
       <nav class="no-scrollbar flex gap-1 overflow-x-auto px-3 pb-2" aria-label="Navegación principal">
         {% for key, label, href in nav %}

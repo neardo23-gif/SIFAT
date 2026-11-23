@@ -18,7 +18,15 @@ cp .env.example .env          # y llena API_KEY, BACKEND_API_KEY y SECRET_KEY
 python app.py                 # http://127.0.0.1:5000  (el backend debe estar encendido)
 pytest                        # pruebas sin red
 ```
-Las pruebas no necesitan red: simulan API Gateway y el backend. Para probar contra los servicios
+Las pruebas no necesitan red: simulan API Gateway y el backend.
+
+**En navegador** (Chromium con Playwright, contra un backend simulado en memoria, sin tocar la base):
+```bash
+pip install -r requirements-e2e.txt && python -m playwright install chromium
+pytest tests/e2e
+```
+Sin Playwright instalado, `pytest` se salta estas pruebas.
+ Para probar contra los servicios
 reales (solo lectura): `SIFAT_PRUEBAS_REALES=1 pytest tests/test_integracion_real.py`.
 
 ## Qué puede hacer cada rol
@@ -31,9 +39,12 @@ reales (solo lectura): `SIFAT_PRUEBAS_REALES=1 pytest tests/test_integracion_rea
 | Emitir facturas | ✓ | ✓ |
 | Cancelar facturas (vigentes y sin pagos) | ✓ | |
 | Registrar pagos | ✓ | ✓ |
-| Registrar usuarios (pantalla Usuarios) | ✓ | |
+| Registrar, desactivar y restablecer la contraseña de usuarios | ✓ | |
+| Cambiar su propia contraseña (Mi cuenta) | ✓ | ✓ |
 
 Los permisos se validan en el servidor (`PERMISOS` en `seguridad.py`); ocultar botones es solo comodidad.
+Cada 5 minutos el front pregunta al backend si el usuario sigue activo: si un Administrador lo
+desactiva, pierde el acceso en minutos aunque tenga la sesión abierta.
 Quién emite una factura lo decide la sesión, y precios e impuestos los pone el backend desde el catálogo.
 
 ## Rutas del proxy
@@ -47,6 +58,9 @@ Quién emite una factura lo decide la sesión, y precios e impuestos los pone el
 | POST | `/api/facturas/<folio>/cancelar` | Backend `POST /facturas/<folio>/cancelar` |
 | POST | `/api/pagos` | Backend `POST /pagos` |
 | POST | `/api/usuarios` | Backend `POST /usuarios` (la confirmación de contraseña se revisa en el front) |
+| PATCH | `/api/usuarios/<id>` | Backend `PATCH /usuarios/<id>` (activar/desactivar; nunca a uno mismo) |
+| POST | `/api/usuarios/<id>/contrasena` | Backend `POST /usuarios/<id>/contrasena` |
+| POST | `/api/cuenta/contrasena` | Backend `POST /auth/cambiar-contrasena` (el usuario sale de la sesión) |
 | GET | `/salud` | Comprobación de vida (pública) |
 
 Todas las rutas `/api/` piden sesión, y las que escriben piden además el token CSRF (cabecera `X-CSRF-Token`).
@@ -84,7 +98,7 @@ seguridad.py        sesión, PERMISOS por rol, CSRF, límite de intentos, cabece
 backend.py          llamadas al backend (MySQL) y a API Gateway (catálogo)
 rutas/              un Blueprint por pantalla, con su página y sus rutas /api/
   auth.py           portada, login, logout, /salud
-  catalogo.py · clientes.py · facturas.py · pagos.py · usuarios.py
+  catalogo.py · clientes.py · facturas.py · pagos.py · usuarios.py · cuenta.py
   comun.py          utilidades compartidas (fechas, moneda, JSON)
 templates/          una plantilla por pantalla + base, app_base y _avisos
 static/js/comun.js  utilidades del navegador (window.SIFAT); se carga en todas las páginas

@@ -122,8 +122,36 @@
   /** Texto decimal con hasta 2 decimales ("12", "12.5", "12.50"). */
   const DECIMAL_RE = /^\d+(\.\d{1,2})?$/;
 
+  /* ---------------- reglas de contraseña (las mismas que revisa el servidor) ---------------- */
+  /** Devuelve {largo, letras, personal, igual}: true si se cumple cada regla. */
+  // Minúsculas y sin acentos, para que "Pérez" y "perez" cuenten igual
+  const plano = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  function reglasContrasena(p, { nombre = '', email = '', confirmacion = '' } = {}) {
+    const t = plano(p);
+    const usuarioCorreo = plano(email).split('@')[0];
+    const partes = plano(nombre).replace(/-/g, ' ').split(/\s+/).filter((x) => x.length >= 4);
+    return {
+      largo: p.length >= 12,
+      letras: /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(p) && /\d/.test(p),
+      personal: p.length > 0 && !(usuarioCorreo.length >= 4 && t.includes(usuarioCorreo))
+        && !partes.some((x) => t.includes(x)) && new Set(p).size >= 5,
+      igual: p.length > 0 && p === confirmacion,
+    };
+  }
+
+  /** Marca con ✓ u ○ cada <li data-regla="..."> de la lista según las reglas. */
+  function pintarReglas(lista, reglas) {
+    $$('[data-regla]', lista).forEach((li) => {
+      const ok = reglas[li.dataset.regla];
+      li.textContent = (ok ? '✓ ' : '○ ') + li.textContent.slice(2);
+      li.classList.toggle('text-soft', ok);
+      li.classList.toggle('text-mute', !ok);
+    });
+  }
+
   window.SIFAT = Object.freeze({
     $, $$, h, money, csrf, toast, api, mostrarError, recargarCon, leerJSON, DECIMAL_RE,
-    openDialog, closeDialog,
+    openDialog, closeDialog, reglasContrasena, pintarReglas,
   });
 })();

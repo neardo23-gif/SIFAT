@@ -166,7 +166,7 @@ def test_backend_facturas_transforma_y_renderiza(modo_real, red):
     llamada = red.llamadas[0]
     assert llamada["url"] == "http://backend.test/facturas"
     assert llamada["headers"] == {"X-API-Key": "clave-backend-prueba"}
-    assert llamada["params"] == {"limite": 200}
+    assert llamada["params"] == {"limite": 51, "desde": 0}  # 50 por página + 1 para saber si hay más
 
 
 def test_backend_clientes_transforma_y_renderiza(modo_real, red):
@@ -177,7 +177,7 @@ def test_backend_clientes_transforma_y_renderiza(modo_real, red):
     assert "CBA010101AA1" in pagina and "62000" in pagina
     assert red.llamadas[0]["url"] == "http://backend.test/clientes"
     # Se listan también los inactivos, para poder reactivarlos
-    assert red.llamadas[0]["params"] == {"limite": 200, "incluir_inactivos": "true"}
+    assert red.llamadas[0]["params"] == {"limite": 51, "desde": 0, "incluir_inactivos": "true"}
 
 
 def test_backend_pagos_transforma_y_renderiza(modo_real, red):

@@ -32,7 +32,7 @@ def consultar_backend(ruta, llave, **filtros):
     if _falta_backend():
         return [], FALTA_BACKEND
     try:
-        r = requests.get(f"{config.BACKEND_URL}{ruta}", params={"limite": 200, **filtros},
+        r = requests.get(f"{config.BACKEND_URL}{ruta}", params={"limite": MAXIMO_BACKEND, **filtros},
                          headers=_cabeceras_backend(), timeout=config.TIMEOUT)
     except requests.RequestException as exc:
         return [], f"No se pudo contactar al backend en {config.BACKEND_URL} ({exc.__class__.__name__}). ¿Está encendido?"
@@ -45,6 +45,32 @@ def consultar_backend(ruta, llave, **filtros):
         return (datos if llave is None else datos.get(llave, [])), None
     except ValueError:
         return [], "El backend devolvió una respuesta inválida."
+
+
+POR_PAGINA = 50
+MAXIMO_BACKEND = 200  # el backend no entrega más de 200 por petición
+TOPE_TODO = 5000      # tope de seguridad al pedir una lista completa
+
+
+def consultar_pagina(ruta, llave, pagina=1, por_pagina=POR_PAGINA, **filtros):
+    """Devuelve (filas, hay_mas, error). Pide una fila de más para saber si hay otra página."""
+    datos, error = consultar_backend(ruta, llave, limite=por_pagina + 1,
+                                     desde=(pagina - 1) * por_pagina, **filtros)
+    return datos[:por_pagina], len(datos) > por_pagina, error
+
+
+def consultar_todo(ruta, llave, **filtros):
+    """Devuelve (lista completa, error) recorriendo todas las páginas del backend."""
+    todo, desde = [], 0
+    while desde < TOPE_TODO:
+        datos, error = consultar_backend(ruta, llave, limite=MAXIMO_BACKEND, desde=desde, **filtros)
+        if error:
+            return todo, error
+        todo.extend(datos)
+        if len(datos) < MAXIMO_BACKEND:
+            break
+        desde += MAXIMO_BACKEND
+    return todo, None
 
 
 CATALOGOS_VACIOS = {"regimenes": [], "usos-cfdi": [], "formas-pago": [], "metodos-pago": []}
@@ -76,6 +102,25 @@ def autenticar(email, password):
     return None, "No se pudo iniciar sesión. Intenta más tarde."
 
 
+def estado_usuario(id_usuario):
+    """Devuelve (datos, estado) con estado 'ok', 'inexistente' o 'sin_respuesta'."""
+    if _falta_backend():
+        return None, "sin_respuesta"
+    try:
+        r = requests.get(f"{config.BACKEND_URL}/usuarios/{int(id_usuario)}",
+                         headers=_cabeceras_backend(), timeout=config.TIMEOUT)
+    except requests.RequestException:
+        return None, "sin_respuesta"
+    if r.status_code == 404:
+        return None, "inexistente"
+    if r.status_code != 200:
+        return None, "sin_respuesta"
+    try:
+        return r.json(), "ok"
+    except ValueError:
+        return None, "sin_respuesta"
+
+
 # Nombres legibles para los errores de validación que devuelve el backend
 ETIQUETAS = {
     "rfc": "RFC", "razon_social": "razón social", "cp_fiscal": "C.P. fiscal",
@@ -85,6 +130,7 @@ ETIQUETAS = {
     "conceptos": "conceptos", "id_servicio": "servicio", "cantidad": "cantidad",
     "motivo": "motivo", "folio": "factura", "monto": "monto", "referencia": "referencia",
     "nombre": "nombre", "apellidos": "apellidos", "password": "contraseña", "rol": "rol",
+    "actual": "contraseña actual", "nueva": "contraseña nueva",
 }
 
 

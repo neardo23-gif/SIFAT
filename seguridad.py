@@ -6,6 +6,8 @@ from collections import defaultdict, deque
 
 from flask import current_app, jsonify, redirect, request, session, url_for
 
+import backend
+
 # Lo que se puede abrir sin iniciar sesión (nombres de endpoint de Flask)
 RUTAS_PUBLICAS = {"auth.portada", "auth.login", "auth.salud", "static"}
 
@@ -76,12 +78,37 @@ def demasiados_intentos(ip):
     return False
 
 
+# ---------------- Revalidación de la sesión ----------------
+# Cada cierto tiempo se pregunta al backend si el usuario sigue activo y con qué rol.
+# Así, si un Administrador lo desactiva, pierde el acceso en minutos y no al expirar la cookie.
+REVALIDAR_CADA = 5 * 60
+
+
+def sesion_vigente():
+    """False si el usuario fue desactivado o eliminado. Actualiza el rol si cambió."""
+    usuario = usuario_actual()
+    ahora = time.time()
+    if ahora - session.get("verificado", 0) < REVALIDAR_CADA:
+        return True
+    datos, estado = backend.estado_usuario(usuario["id_usuario"])
+    if estado == "inexistente" or (estado == "ok" and not datos.get("activo")):
+        return False
+    if estado == "ok":
+        if datos.get("rol") != usuario.get("rol"):
+            session["usuario"] = {**usuario, "rol": datos["rol"]}
+        session["verificado"] = ahora
+    # Si el backend no responde no se saca a nadie: las pantallas ya mostrarán el error
+    return True
+
+
 # ---------------- Ganchos de la app ----------------
 def exigir_sesion():
     if request.endpoint in RUTAS_PUBLICAS or request.endpoint is None:
         return None
     if usuario_actual():
-        return None
+        if sesion_vigente():
+            return None
+        session.clear()
     if request.path.startswith("/api/"):
         return jsonify({"mensaje": "Inicia sesión para continuar"}), 401
     return redirect(url_for("auth.portada", _anchor="acceso"))

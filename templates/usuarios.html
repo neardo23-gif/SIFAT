@@ -16,7 +16,7 @@
 
 <section class="mt-8 overflow-hidden rounded-2xl border border-line bg-panel" aria-labelledby="t-usr">
   <h2 id="t-usr" class="sr-only">Lista de usuarios</h2>
-  <div class="overflow-x-auto">
+  <div class="relative overflow-x-auto">
     <table class="w-full min-w-[680px] text-left text-[15px]">
       <caption class="sr-only">Usuarios registrados</caption>
       <thead>
@@ -26,6 +26,7 @@
           <th scope="col" class="px-4 py-3 font-medium">Rol</th>
           <th scope="col" class="px-4 py-3 font-medium">Último acceso</th>
           <th scope="col" class="px-4 py-3 font-medium">Estado</th>
+          <th scope="col" class="px-4 py-3"><span class="sr-only">Acciones</span></th>
         </tr>
       </thead>
       <tbody>
@@ -39,6 +40,15 @@
             {% if not u.activo %}<span class="chip text-mute"><span class="dot border border-mute"></span>Inactivo</span>
             {% elif not u.tiene_contrasena %}<span class="chip"><span class="dot bg-sello"></span>Sin contraseña</span>
             {% else %}<span class="chip"><span class="dot bg-soft"></span>Activo</span>{% endif %}
+          </td>
+          <td class="whitespace-nowrap px-4 py-3.5 text-right">
+            {% if u.id == yo %}
+            <a href="{{ url_for('cuenta.pantalla') }}" class="btn btn-ghost btn-sm">Mi contraseña</a>
+            {% else %}
+            {% set datos_u %}data-id="{{ u.id }}" data-nombre="{{ u.nombre }}" data-email="{{ u.email }}" data-activo="{{ 'true' if u.activo else 'false' }}"{% endset %}
+            <button type="button" class="btn btn-ghost btn-sm" data-action="restablecer" {{ datos_u }} aria-label="Restablecer la contraseña de {{ u.nombre }}">Contraseña</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="cambiar-estado" {{ datos_u }}>{{ 'Desactivar' if u.activo else 'Activar' }}</button>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -105,6 +115,61 @@
     <div class="flex justify-end gap-2 border-t border-line p-4">
       <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
       <button type="submit" class="btn btn-primary" id="usr-submit">Registrar usuario</button>
+    </div>
+  </form>
+</dialog>
+
+{# ---------- Restablecer contraseña ---------- #}
+<dialog id="dlg-restablecer" class="modal w-[min(560px,calc(100vw-2rem))]" aria-labelledby="res-titulo">
+  <form id="form-restablecer" novalidate autocomplete="off">
+    <div class="flex items-center justify-between gap-4 border-b border-line p-5">
+      <h2 id="res-titulo" class="text-[22px] font-bold tracking-tight">Nueva contraseña para <span id="res-nombre"></span></h2>
+      <button type="button" class="icon-btn" data-close aria-label="Cerrar formulario">{{ icon('cerrar') }}</button>
+    </div>
+    <div class="space-y-5 p-5">
+      <p class="text-[15px] text-mute">Úsalo si la persona olvidó su contraseña. También desbloquea la cuenta si tenía intentos fallidos. Dásela en persona o por un medio privado.</p>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="label" for="r-pass">Contraseña nueva</label>
+          <div class="relative">
+            <input id="r-pass" type="password" class="field field-pr" maxlength="128" autocomplete="new-password" aria-describedby="r-reglas">
+            <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="r-pass" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+          </div>
+        </div>
+        <div>
+          <label class="label" for="r-pass2">Confirmar contraseña</label>
+          <div class="relative">
+            <input id="r-pass2" type="password" class="field field-pr" maxlength="128" autocomplete="new-password">
+            <button type="button" class="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2" data-toggle-pass="r-pass2" aria-label="Mostrar contraseña" aria-pressed="false">{{ icon('ojo') }}</button>
+          </div>
+        </div>
+      </div>
+      <ul id="r-reglas" class="grid gap-1 text-[14px] text-mute sm:grid-cols-2" aria-live="polite">
+        <li data-regla="largo">○ Al menos 12 caracteres</li>
+        <li data-regla="letras">○ Letras y números</li>
+        <li data-regla="personal">○ Sin su nombre ni su correo, no repetitiva</li>
+        <li data-regla="igual">○ Las dos contraseñas coinciden</li>
+      </ul>
+      <p id="res-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-line p-4">
+      <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="res-submit">Guardar contraseña</button>
+    </div>
+  </form>
+</dialog>
+
+{# ---------- Activar / desactivar ---------- #}
+<dialog id="dlg-estado" class="modal w-[min(500px,calc(100vw-2rem))]" aria-labelledby="est-titulo">
+  <form id="form-estado" novalidate>
+    <div class="p-6">
+      <h2 id="est-titulo" class="text-[22px] font-bold tracking-tight"></h2>
+      <p id="est-texto" class="mt-2 text-[15px] text-mute"></p>
+      <p id="est-error" class="mt-3 hidden text-[14px] text-sello" role="alert"></p>
+    </div>
+    <div class="flex justify-between gap-2 border-t border-line p-4">
+      <button type="button" class="btn btn-light" data-close>Cancelar</button>
+      <button type="submit" class="btn btn-danger" id="est-submit">Desactivar</button>
     </div>
   </form>
 </dialog>
