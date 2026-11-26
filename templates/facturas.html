@@ -72,6 +72,8 @@
   'puede_pagar': puede('registrar_pago'),
   'url_pagos': url_for('pagos.pantalla'),
   'servicios': servicios_activos,
+  'tasa_isr': tasa_isr,
+  'retiene_isr': clientes_activos|selectattr('retiene_isr')|map(attribute='id_cliente')|list,
 }|tojson }}</script>
 
 {# ---------- Detalle de factura ---------- #}
@@ -176,9 +178,10 @@
         <dl class="ml-auto w-full max-w-[280px] space-y-1.5 text-[15px] tabular-nums">
           <div class="flex justify-between"><dt class="text-mute">Subtotal</dt><dd id="n-subtotal">$0.00</dd></div>
           <div class="flex justify-between"><dt class="text-mute">IVA</dt><dd id="n-iva">$0.00</dd></div>
+          <div class="flex justify-between" id="n-isr-fila" hidden><dt class="text-mute">ISR retenido (10 %)</dt><dd id="n-isr">-$0.00</dd></div>
           <div class="flex justify-between border-t border-line pt-1.5 font-semibold"><dt>Total</dt><dd id="n-total">$0.00</dd></div>
         </dl>
-        <p class="hint mt-3">Estimado con los precios actuales del catálogo. El servidor calcula el total definitivo al emitir.</p>
+        <p class="hint mt-3">Estimado con los precios actuales del catálogo. A las personas morales se les retiene ISR. El servidor calcula el total definitivo al emitir.</p>
       </div>
       <p id="n-error" class="hidden rounded-lg border border-sello/40 bg-sello/10 px-3 py-2 text-[14px]" role="alert"></p>
     </div>

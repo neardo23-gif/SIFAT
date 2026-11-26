@@ -79,11 +79,10 @@
         );
         return tr;
       }));
-      $('#fac-totales').replaceChildren(
-        fila('Subtotal', money.format(f.subtotal)),
-        fila('IVA', money.format(f.iva)),
-        fila('Total', money.format(f.total), true),
-      );
+      const totales = [fila('Subtotal', money.format(f.subtotal)), fila('IVA', money.format(f.iva))];
+      if (Number(f.isr) > 0) totales.push(fila('ISR retenido', '-' + money.format(f.isr)));
+      totales.push(fila('Total', money.format(f.total), true));
+      $('#fac-totales').replaceChildren(...totales);
       const pagos = $('#fac-pagos');
       pagos.replaceChildren();
       if (!f.pagos.length) {
@@ -125,13 +124,16 @@
 
     /* ---- nueva factura ---- */
     const servicios = new Map(cfg.servicios.map((s) => [s.id_servicio, s]));
+    const retieneIsr = new Set(cfg.retiene_isr || []);
     const lista = $('#n-conceptos');
 
     // Misma regla que el servidor: se redondea cada importe a centavos (mitad hacia arriba)
     const centavos = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
 
     function recalcular() {
-      let subtotal = 0; let iva = 0;
+      let subtotal = 0; let iva = 0; let isr = 0;
+      const cliente = $('#n-cliente');
+      const tasaIsr = cliente && retieneIsr.has(parseInt(cliente.value, 10)) ? Number(cfg.tasa_isr) : 0;
       $$('#n-conceptos > div').forEach((row) => {
         const s = servicios.get($('select', row).value);
         const cant = $('input', row).value.trim();
@@ -140,11 +142,14 @@
         const importe = centavos(Number(cant) * Number(s.precio_unitario));
         subtotal += importe;
         iva += centavos(importe * Number(s.tasa));
+        isr += centavos(importe * tasaIsr);
         etiqueta.textContent = money.format(importe);
       });
       $('#n-subtotal').textContent = money.format(subtotal);
       $('#n-iva').textContent = money.format(iva);
-      $('#n-total').textContent = money.format(centavos(subtotal) + centavos(iva));
+      $('#n-isr-fila').hidden = !tasaIsr;
+      $('#n-isr').textContent = '-' + money.format(centavos(isr));
+      $('#n-total').textContent = money.format(centavos(centavos(subtotal) + centavos(iva) - centavos(isr)));
     }
 
     function filaConcepto() {
@@ -183,6 +188,7 @@
     }
 
     if (dlgNueva) {
+      $('#n-cliente').addEventListener('change', recalcular);
       $('#form-factura').addEventListener('submit', async (e) => {
         e.preventDefault();
         const box = $('#n-error');

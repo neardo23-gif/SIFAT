@@ -8,13 +8,16 @@ from rutas.comun import (FOLIO_RE, JSON_INVALIDO, contexto_base, fecha_corta, js
 
 bp = Blueprint("facturas", __name__)
 
+# Solo para el estimado en pantalla: la retención real la decide el backend al emitir
+TASA_ISR = 0.10
+
 
 @bp.route("/facturas")
 def pantalla():
     pagina = pagina_pedida()
     datos, hay_mas, error = backend.consultar_pagina("/facturas", "facturas", pagina)
     filas = [{"folio": f["folio"], "cliente": f["cliente"], "fecha": fecha_corta(f["fecha_emision"]),
-              "subtotal": f["subtotal"], "iva": f["iva"], "total": f["total"],
+              "subtotal": f["subtotal"], "iva": f["iva"], "isr": f.get("isr", 0), "total": f["total"],
               "estatus": f["estatus"]} for f in datos]
 
     # Lo que necesita el formulario de "Nueva factura": clientes activos,
@@ -25,8 +28,11 @@ def pantalla():
     if seguridad.puede("emitir_factura") and not error:
         catalogos, error_cat = backend.catalogos_sat()
         crudos, error_cli = backend.consultar_todo("/clientes", "clientes")
+        # A una persona moral se le retiene ISR: se marca para el estimado del formulario
+        morales = {r["clave"] for r in catalogos["regimenes"] if r.get("tipo_persona") == "M"}
         clientes_activos = [{"id_cliente": c["id_cliente"], "razon_social": c["razon_social"],
-                             "rfc": c["rfc"]} for c in crudos]
+                             "rfc": c["rfc"], "retiene_isr": c.get("clave_regimen") in morales}
+                            for c in crudos]
         servicios, error_srv = backend.listar_servicios()
         servicios_activos = [{"id_servicio": s["id_servicio"], "clave": s.get("clave", ""),
                               "nombre": s.get("nombre", ""),
@@ -39,7 +45,7 @@ def pantalla():
             aviso = f"No se podrán emitir facturas por ahora: {problema}"
     return render_template("facturas.html", facturas=filas, error=error, aviso=aviso,
                            catalogos=catalogos, clientes_activos=clientes_activos,
-                           servicios_activos=servicios_activos, paginas=paginacion(pagina, hay_mas),
+                           servicios_activos=servicios_activos, tasa_isr=TASA_ISR, paginas=paginacion(pagina, hay_mas),
                            **contexto_base("facturas"))
 
 

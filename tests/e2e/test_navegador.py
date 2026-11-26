@@ -101,26 +101,29 @@ def _emitir(nav, conceptos):
 def test_factura_pago_parcial_y_cancelacion(nav):
     entrar(nav, *ADMIN)
     _emitir(nav, [("SRV-001", "2"), ("SRV-002", "1.5")])
-    # Totales estimados en pantalla: 698.00 + 6750.75 = 7448.75; IVA 111.68 + 1080.12
+    # Totales estimados en pantalla: 698.00 + 6750.75 = 7448.75; IVA 111.68 + 1080.12;
+    # el cliente es persona moral (601): ISR retenido 69.80 + 675.08
     expect(nav.locator("#n-subtotal")).to_have_text("$7,448.75")
     expect(nav.locator("#n-iva")).to_have_text("$1,191.80")
-    expect(nav.locator("#n-total")).to_have_text("$8,640.55")
+    expect(nav.locator("#n-isr")).to_have_text("-$744.88")
+    expect(nav.locator("#n-total")).to_have_text("$7,895.67")
     nav.get_by_role("button", name="Emitir factura").click()
-    aviso(nav, "Factura FAC-0100 emitida por $8,640.55")
+    aviso(nav, "Factura FAC-0100 emitida por $7,895.67")
 
     # Detalle: conceptos, saldo y botones
     nav.get_by_role("button", name="FAC-0100").click()
     det = nav.locator("#dlg-factura")
     expect(det.locator("#fac-conceptos tr")).to_have_count(2)
-    expect(det.locator("#fac-datos")).to_contain_text("$8,640.55")
+    expect(det.locator("#fac-datos")).to_contain_text("$7,895.67")
+    expect(det.locator("#fac-totales")).to_contain_text("ISR retenido-$744.88")
     expect(det.get_by_role("button", name="Cancelar factura")).to_be_visible()
 
     # Registrar pago desde el detalle: abre Pagos con la factura y el saldo puestos
     det.get_by_role("link", name="Registrar pago").click()
     nav.wait_for_url("**/pagos?folio=FAC-0100")
     expect(nav.locator("#dlg-pago")).to_be_visible()
-    expect(nav.locator("#p-monto")).to_have_value("8640.55")
-    expect(nav.locator("#p-saldo")).to_contain_text("Saldo pendiente: $8,640.55")
+    expect(nav.locator("#p-monto")).to_have_value("7895.67")
+    expect(nav.locator("#p-saldo")).to_contain_text("Saldo pendiente: $7,895.67")
 
     # Más que el saldo: lo frena el navegador
     nav.fill("#p-monto", "9000")
@@ -130,13 +133,13 @@ def test_factura_pago_parcial_y_cancelacion(nav):
     nav.fill("#p-monto", "1000")
     nav.fill("#p-ref", "SPEI-123")
     nav.locator("#dlg-pago").get_by_role("button", name="Registrar pago").click()
-    aviso(nav, "Saldo restante: $7,640.55")
+    aviso(nav, "Saldo restante: $6,895.67")
     expect(nav.locator("main table")).to_contain_text("SPEI-123")
 
     # Con pagos ya no se puede cancelar
     ir(nav, "Facturas")
     nav.get_by_role("button", name="FAC-0100").click()
-    expect(nav.locator("#fac-datos")).to_contain_text("$7,640.55")
+    expect(nav.locator("#fac-datos")).to_contain_text("$6,895.67")
     expect(nav.locator("#fac-cancelar")).to_be_hidden()
     nav.locator("#dlg-factura").get_by_role("button", name="Cerrar").last.click()
 

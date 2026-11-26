@@ -196,7 +196,8 @@ def crear_backend_falso():
     def detalle(f):
         pagado = sum((p["monto"] for p in pagos if p["folio"] == f["folio"]), Decimal("0"))
         saldo = Decimal("0") if f["estatus"] == "cancelada" else f["total"] - pagado
-        return {**f, "subtotal": float(f["subtotal"]), "iva": float(f["iva"]), "total": float(f["total"]),
+        return {**f, "subtotal": float(f["subtotal"]), "iva": float(f["iva"]), "isr": float(f["isr"]),
+                "total": float(f["total"]),
                 "saldo": float(saldo),
                 "pagos": [{**p, "monto": float(p["monto"])} for p in pagos if p["folio"] == f["folio"]]}
 
@@ -217,25 +218,30 @@ def crear_backend_falso():
         cliente = clientes.get(d["id_cliente"])
         if not cliente or not cliente["activo"]:
             return error("El cliente no existe")
+        # Como el backend real: a una persona moral (601) se le retiene 10 % de ISR
+        tasa_isr = Decimal("0.10") if cliente.get("clave_regimen") == "601" else Decimal("0")
         conceptos = []
         for c in d["conceptos"]:
             s = next(x for x in servicios if x["id_servicio"] == c["id_servicio"])
             importe = _r(Decimal(c["cantidad"]) * Decimal(str(s["precio_unitario"])))
             iva = _r(importe * Decimal(str(s["impuesto"]["tasa"])))
+            isr = _r(importe * tasa_isr)
             conceptos.append({"id_servicio": s["id_servicio"], "clave_servicio": s["clave"],
                               "nombre_servicio": s["nombre"], "cantidad": float(c["cantidad"]),
                               "precio_unitario": s["precio_unitario"], "importe": float(importe),
                               "tasa_aplicada": s["impuesto"]["tasa"], "iva_importe": float(iva),
-                              "_importe": importe, "_iva": iva})
+                              "tasa_isr": float(tasa_isr), "isr_importe": float(isr),
+                              "_importe": importe, "_iva": iva, "_isr": isr})
         subtotal = sum((c.pop("_importe") for c in conceptos), Decimal("0"))
         iva = sum((c.pop("_iva") for c in conceptos), Decimal("0"))
+        isr = sum((c.pop("_isr") for c in conceptos), Decimal("0"))
         with candado:
             folio = f"FAC-{next(folios):04d}"
         usuario = usuarios[d["id_usuario"]]
         facturas[folio] = {
             "folio": folio, "id_cliente": cliente["id_cliente"], "cliente": cliente["razon_social"],
             "rfc": cliente["rfc"], "fecha_emision": ahora(), "subtotal": _r(subtotal), "iva": _r(iva),
-            "total": _r(subtotal + iva), "estatus": "vigente", "usuario": usuario["nombre"],
+            "isr": _r(isr), "total": _r(subtotal + iva - isr), "estatus": "vigente", "usuario": usuario["nombre"],
             "clave_forma_pago": d["clave_forma_pago"], "forma_pago": formas[d["clave_forma_pago"]],
             "clave_metodo_pago": d["clave_metodo_pago"], "metodo_pago": metodos[d["clave_metodo_pago"]],
             "motivo_cancelacion": None, "fecha_cancelacion": None, "conceptos": conceptos,
